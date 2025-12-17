@@ -440,18 +440,24 @@ def handle_group(message):
 # ================= WEBHOOK =================
 @app.route("/" + TOKEN, methods=["POST"])
 def telegram_webhook():
-    update = telebot.types.Update.de_json(flask.request.get_data().decode("utf-8"))
+    update = telebot.types.Update.de_json(
+        flask.request.get_data().decode("utf-8")
+    )
     bot.process_new_updates([update])
     return "OK", 200
 
+
 @app.route("/")
 def index():
-    bot.set_webhook(
-        url="https://" + flask.request.host + "/" + TOKEN,
-        drop_pending_updates=True
-    )
-    return "Bot is alive and webhook set!"
+    return "Bot is alive"
 
 # ================= RUN =================
+
+if os.environ.get("RENDER"):
+    bot.set_webhook(
+        url="https://meniny-bot.onrender.com/" + TOKEN,
+        drop_pending_updates=True
+    )
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
