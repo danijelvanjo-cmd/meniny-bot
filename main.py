@@ -3,9 +3,12 @@ import flask
 import os
 from datetime import datetime
 
-TOKEN = os.environ['TOKEN']
-bot = telebot.TeleBot(TOKEN)
+# ================= CONFIG =================
+TOKEN = os.environ["TOKEN"]
+
+bot = telebot.TeleBot(TOKEN, threaded=True)
 app = flask.Flask(__name__)
+
 
 # Full namedays dict (from your Vojvodina calendar)
 namedays = {
@@ -377,84 +380,78 @@ namedays = {
     "12-31": "Silvester",
 }
 
-# Reverse index for name search
+
+
+# ================= REVERSE INDEX =================
 name_to_date = {}
-for date, names_str in namedays.items():
-    cleaned = names_str.replace(' a ', ', ').replace(' - ', ', ')
-    for name in [n.strip() for n in cleaned.split(',') if n.strip()]:
+for date, names in namedays.items():
+    cleaned = names.replace(" a ", ", ").replace(" - ", ", ")
+    for name in [n.strip() for n in cleaned.split(",") if n.strip()]:
         name_to_date[name.lower()] = date
 
-# Help
-@bot.message_handler(commands=['start', 'help'])
+# ================= COMMANDS =================
+@bot.message_handler(commands=["start", "help"])
 def send_help(message):
-    help_text = (
+    bot.send_message(
+        message.chat.id,
         "Simple meniny bot 😊\n\n"
         "/meniny → today's meniny\n"
         "/meniny dnes → same\n"
         "/meniny 17.12 → meniny on that date\n"
         "/meniny Daniel → date for that name\n\n"
-        "!meniny → today's meniny (in groups)"
+        "!meniny → today's meniny (groups)"
     )
-    bot.send_message(message.chat.id, help_text)
 
-# /meniny handler
-@bot.message_handler(commands=['meniny'])
+@bot.message_handler(commands=["meniny"])
 def handle_meniny(message):
     args = message.text.split(maxsplit=1)
     query = args[1].strip() if len(args) > 1 else ""
 
     if not query or query.lower() in ["dnes", "today", "dneska"]:
-        today_key = datetime.now().strftime("%m-%d")
-        names = namedays.get(today_key, "No entry today.")
-        date_str = datetime.now().strftime("%d.%m.%Y")
-        bot.send_message(message.chat.id, f"Today ({date_str}): {names}")
+        key = datetime.now().strftime("%m-%d")
+        names = namedays.get(key, "No entry today.")
+        date = datetime.now().strftime("%d.%m.%Y")
+        bot.send_message(message.chat.id, f"Today ({date}): {names}")
 
-    elif any(sep in query for sep in ['.', '-', '/']):
+    elif any(sep in query for sep in [".", "-", "/"]):
         try:
-            cleaned = query.replace('/', '.').replace('-', '.')
-            parts = cleaned.split('.')
-            day = parts[0].zfill(2)
-            month = parts[1].zfill(2)
-            key = f"{month}-{day}"
-            names = namedays.get(key, "No entry on this date.")
-            bot.send_message(message.chat.id, f"{query}: {names}")
+            cleaned = query.replace("/", ".").replace("-", ".")
+            day, month = cleaned.split(".")[:2]
+            key = f"{month.zfill(2)}-{day.zfill(2)}"
+            bot.send_message(message.chat.id, f"{query}: {namedays.get(key, 'No entry on this date.')}")
         except:
             bot.send_message(message.chat.id, "Wrong date format – use dd.mm 😅")
 
     else:
         date = name_to_date.get(query.lower())
         if date:
-            d, m = date.split('-')
-            full = namedays[date]
-            bot.send_message(message.chat.id, f"{query.capitalize()} has meniny on {d}.{m}. ({full})")
+            d, m = date.split("-")
+            bot.send_message(message.chat.id, f"{query.capitalize()} has meniny on {d}.{m}.")
         else:
             bot.send_message(message.chat.id, "Name not found 😔")
 
-# !meniny handler (for groups)
-@bot.message_handler(func=lambda m: m.text and m.text.strip().lower().startswith('!meniny'))
-def handle_bang(message):
-    query = message.text[7:].strip()
-    if query:
-        bot.send_message(message.chat.id, "Just type !meniny for today 😊")
-        return
-    today_key = datetime.now().strftime("%m-%d")
-    names = namedays.get(today_key, "No entry today.")
-    date_str = datetime.now().strftime("%d.%m.%Y")
-    bot.send_message(message.chat.id, f"Today ({date_str}): {names}")
+@bot.message_handler(func=lambda m: m.text and m.text.lower().startswith("!meniny"))
+def handle_group(message):
+    key = datetime.now().strftime("%m-%d")
+    names = namedays.get(key, "No entry today.")
+    date = datetime.now().strftime("%d.%m.%Y")
+    bot.send_message(message.chat.id, f"Today ({date}): {names}")
 
-# Webhook routes
-@app.route('/' + TOKEN, methods=['POST'])
-def get_message():
-    json_string = flask.request.get_data().decode('utf-8')
-    update = telebot.types.Update.de_json(json_string)
+# ================= WEBHOOK =================
+@app.route("/" + TOKEN, methods=["POST"])
+def telegram_webhook():
+    update = telebot.types.Update.de_json(flask.request.get_data().decode("utf-8"))
     bot.process_new_updates([update])
-    return "!", 200
+    return "OK", 200
 
-@app.route('/')
+@app.route("/")
 def index():
-    bot.remove_webhook()
-    bot.set_webhook(url="https://" + flask.request.host + '/' + TOKEN)
+    bot.set_webhook(
+        url="https://" + flask.request.host + "/" + TOKEN,
+        drop_pending_updates=True
+    )
     return "Bot is alive and webhook set!"
 
+# ================= RUN =================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
