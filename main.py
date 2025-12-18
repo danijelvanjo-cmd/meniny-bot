@@ -196,7 +196,7 @@ namedays = {
     "06-26": "Jeremias, Adriana",
     "06-27": "Ladislav, Natalia",
     "06-28": "Slavoj, Beata",
-    "06-29": "Peter a Pavel",
+    "06-29": "Peter",
     "06-30": "Vlastimir, Melania, Melita",
 
     "07-01": "Lubor, Liliana",
