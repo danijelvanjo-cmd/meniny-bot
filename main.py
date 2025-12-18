@@ -5,7 +5,7 @@ from datetime import datetime
 from collections import defaultdict
 
 TOKEN = os.environ.get("TOKEN")
-bot = telebot.TeleBot(TOKEN, threaded=False)
+bot = telebot.TeleBot(TOKEN)  # threaded=True
 app = flask.Flask(__name__)
 
 
@@ -501,10 +501,11 @@ def index():
     return "Bot is alive"
 
 if os.environ.get("RENDER"):
-    bot.remove_webhook()
+    bot.delete_webhook(drop_pending_updates=True)
     bot.set_webhook(
         url=f"https://meniny-bot.onrender.com/{TOKEN}"
     )
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
