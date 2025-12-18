@@ -6,7 +6,7 @@ from datetime import datetime
 # ================= CONFIG =================
 TOKEN = os.environ["TOKEN"]
 
-bot = telebot.TeleBot(TOKEN, threaded=True)
+bot = telebot.TeleBot(TOKEN, threaded=False)
 app = flask.Flask(__name__)
 
 
@@ -454,9 +454,9 @@ def index():
 # ================= RUN =================
 
 if os.environ.get("RENDER"):
+    bot.remove_webhook()
     bot.set_webhook(
-        url="https://meniny-bot.onrender.com/" + TOKEN,
-        drop_pending_updates=True
+        url=f"https://meniny-bot.onrender.com/{TOKEN}"
     )
 
 if __name__ == "__main__":
