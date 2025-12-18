@@ -1,17 +1,11 @@
 import os
 import flask
 import telebot
-import threading
-import logging
-
 from datetime import datetime
 from collections import defaultdict
 
 TOKEN = os.environ.get("TOKEN")
-bot = telebot.TeleBot(TOKEN)
-
-telebot.logger.setLevel(logging.INFO)
-
+bot = telebot.TeleBot(TOKEN, threaded=False)
 app = flask.Flask(__name__)
 
 
@@ -496,22 +490,10 @@ def handle_group(message):
 # ======================
 @app.route("/" + TOKEN, methods=["POST"])
 def telegram_webhook():
-    try:
-        update = telebot.types.Update.de_json(
-            flask.request.get_data().decode("utf-8")
-        )
-
-        # Process the update in a background thread so Gunicorn sync worker isn't blocked
-        threading.Thread(
-            target=bot.process_new_updates,
-            args=([update],),
-            daemon=True
-        ).start()
-
-    except Exception:
-        # This will show you the real reason in Render logs instead of failing silently
-        telebot.logger.exception("Webhook processing failed")
-
+    update = telebot.types.Update.de_json(
+        flask.request.get_data().decode("utf-8")
+    )
+    bot.process_new_updates([update])
     return "OK", 200
 
 @app.route("/")
