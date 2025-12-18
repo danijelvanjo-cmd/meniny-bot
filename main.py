@@ -37,7 +37,7 @@ namedays = {
     "01-24": "Ctiboh, Timotej",
     "01-25": "Pavel",
     "01-26": "Svatoboj, Tamara",
-    "01-27": "Jan Zlatousty",
+    "01-27": "Jan",
     "01-28": "Karol",
     "01-29": "Pribina",
     "01-30": "Ema, Amadea",
