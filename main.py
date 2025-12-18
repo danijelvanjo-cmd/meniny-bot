@@ -8,10 +8,6 @@ TOKEN = os.environ.get("TOKEN")
 bot = telebot.TeleBot(TOKEN, threaded=False)
 app = flask.Flask(__name__)
 
-# ==================================================
-# namedays DICT (UNCHANGED – YOUR FULL DATA HERE)
-# ==================================================
-
 namedays = {
     "01-Januar": "Novy rok, Jezis",
     "02-Januar": "Abel, Set",
@@ -391,10 +387,6 @@ namedays = {
     "30-December": "Silvester"
 }
 
-
-# ======================
-# MONTH KEY NAMES
-# ======================
 MONTH_KEY_NAMES = {
     "01": "Januar", "02": "Februar", "03": "Marec", "04": "April",
     "05": "Maj", "06": "Jun", "07": "Jul", "08": "August",
@@ -408,9 +400,6 @@ MONTH_GENITIVE = {
     "Oktober": "Oktobra", "November": "Novembra", "December": "Decembra",
 }
 
-# ======================
-# HELPERS
-# ======================
 def split_names(names: str):
     cleaned = names.replace(" a ", ", ").replace(" - ", ", ")
     return [n.strip().lower() for n in cleaned.split(",") if n.strip()]
@@ -420,43 +409,31 @@ def key_to_date(key: str, year: int):
     month_num = list(MONTH_KEY_NAMES.values()).index(month_name) + 1
     return date(year, month_num, int(day))
 
-# ======================
-# NAME → DATES INDEX
-# ======================
 name_to_date = defaultdict(list)
 
 for date_key, names in namedays.items():
     for name in split_names(names):
         name_to_date[name].append(date_key)
 
-# ======================
-# SUBSCRIPTIONS (IN-MEMORY)
-# ======================
-subscriptions = defaultdict(set)  # chat_id -> set of lowercase names
+subscriptions = defaultdict(set) 
 
-# ======================
-# HELP
-# ======================
 @bot.message_handler(commands=["start", "help"])
 def send_help(message):
     bot.send_message(
         message.chat.id,
-        "Zvlastny meninovy bot 😊\n\n"
-        "/meniny → dnesne meniny\n"
-        "/meniny 17.12 → meniny v dany datum\n"
-        "/meniny Daniel → datum menin pre meno\n\n"
-        "/meniny zajtra | vcera\n"
-        "/kedy ma meniny Daniel\n\n"
-        "/odoberat Meno → zvrazni meno pri meninach\n"
-        "/odhlasit Meno → zrusi sledovanie\n"
-        "/sledovane → zobrazit sledovane mena\n\n"
-        "/ziveli Meno → prianie k meninam\n\n"
-        "!meniny → dnesne meniny (v skupinach)"
+        "Zvláštny meninový bot 😊\n\n"
+        "/meniny → dnešné meniny\n"
+        "/meniny 17-12 → meniny v daný dátum\n"
+        "/meniny Daniel → dátum menín pre meno\n\n"
+        "/meniny zajtra | včera\n"
+        "/kedy má meniny Daniel\n\n"
+        "/odoberat Meno → zvýrazní meno pri meninách\n"
+        "/odhlasit Meno → zruší sledovanie\n"
+        "/sledovane → zobrazí sledované mená\n\n"
+        "/ziveli Meno → prianie k meninám\n\n"
+        "!meniny → dnešné meniny (v skupinách)"
     )
 
-# ======================
-# MENINY
-# ======================
 @bot.message_handler(commands=["meniny"])
 def handle_meniny(message):
     args = message.text.split(maxsplit=1)
@@ -521,9 +498,6 @@ def handle_meniny(message):
 
     bot.send_message(message.chat.id, f"{label} ({key}): {names}{emoji}")
 
-# ======================
-# KEDY MA MENINY (DAYS UNTIL)
-# ======================
 @bot.message_handler(commands=["kedy"])
 def handle_kedy(message):
     text = message.text.lower()
@@ -561,9 +535,6 @@ def handle_kedy(message):
             f"{name.capitalize()} ma meniny o {diff} dni ({key})."
         )
 
-# ======================
-# SUBSCRIPTIONS
-# ======================
 @bot.message_handler(commands=["odoberat"])
 def subscribe(message):
     parts = message.text.split(maxsplit=1)
@@ -592,9 +563,6 @@ def show_subscriptions(message):
     else:
         bot.send_message(message.chat.id, "Sledovane mena:\n" + ", ".join(n.capitalize() for n in names))
 
-# ======================
-# ZIVELI
-# ======================
 @bot.message_handler(commands=["ziveli"])
 def ziveli(message):
     parts = message.text.split(maxsplit=1)
@@ -607,18 +575,12 @@ def ziveli(message):
         f"Vsetko najlepsie k meninam, {name}! 🎉 Prajeme vela zdravia a pohody."
     )
 
-# ======================
-# GROUP COMMAND
-# ======================
 @bot.message_handler(func=lambda m: m.text and m.text.lower().startswith("!meniny"))
 def handle_group(message):
     now = datetime.now()
     key = f"{now.day:02d}-{MONTH_KEY_NAMES[now.strftime('%m')]}"
     bot.send_message(message.chat.id, f"Dnes ({key}): {namedays.get(key, 'Dnes nema meniny nikto.')}")
 
-# ======================
-# WEBHOOK (UNCHANGED)
-# ======================
 @app.route("/" + TOKEN, methods=["POST"])
 def telegram_webhook():
     update = telebot.types.Update.de_json(flask.request.get_data().decode("utf-8"))
