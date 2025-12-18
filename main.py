@@ -3,7 +3,6 @@ import flask
 import os
 from datetime import datetime
 
-# ================= CONFIG =================
 TOKEN = os.environ["TOKEN"]
 
 bot = telebot.TeleBot(TOKEN, threaded=False)
@@ -381,25 +380,22 @@ namedays = {
 }
 
 
-
-# ================= REVERSE INDEX =================
 name_to_date = {}
 for date, names in namedays.items():
     cleaned = names.replace(" a ", ", ").replace(" - ", ", ")
     for name in [n.strip() for n in cleaned.split(",") if n.strip()]:
         name_to_date[name.lower()] = date
 
-# ================= COMMANDS =================
 @bot.message_handler(commands=["start", "help"])
 def send_help(message):
     bot.send_message(
         message.chat.id,
-        "Simple meniny bot 😊\n\n"
-        "/meniny → today's meniny\n"
-        "/meniny dnes → same\n"
-        "/meniny 17.12 → meniny on that date\n"
-        "/meniny Daniel → date for that name\n\n"
-        "!meniny → today's meniny (groups)"
+        "Zvláštny meninový bot 😊\n\n"
+        "/meniny → dnešné meniny\n"
+        "/meniny dnes → to isté\n"
+        "/meniny 17.12 → meniny v daný dátum\n"
+        "/meniny Daniel → dátum menín pre dané meno\n\n"
+        "!meniny → dnešné meniny (v skupinách)"
     )
 
 @bot.message_handler(commands=["meniny"])
@@ -407,37 +403,36 @@ def handle_meniny(message):
     args = message.text.split(maxsplit=1)
     query = args[1].strip() if len(args) > 1 else ""
 
-    if not query or query.lower() in ["dnes", "today", "dneska"]:
+    if not query or query.lower() in ["dnes", "dnes", "dneska"]:
         key = datetime.now().strftime("%m-%d")
-        names = namedays.get(key, "No entry today.")
+        names = namedays.get(key, "Dnes nemá meniny nikto.")
         date = datetime.now().strftime("%d.%m.%Y")
-        bot.send_message(message.chat.id, f"Today ({date}): {names}")
+        bot.send_message(message.chat.id, f"Dnes ({date}): {names}")
 
     elif any(sep in query for sep in [".", "-", "/"]):
         try:
             cleaned = query.replace("/", ".").replace("-", ".")
             day, month = cleaned.split(".")[:2]
             key = f"{month.zfill(2)}-{day.zfill(2)}"
-            bot.send_message(message.chat.id, f"{query}: {namedays.get(key, 'No entry on this date.')}")
+            bot.send_message(message.chat.id, f"{query}: {namedays.get(key, 'V tento dátum nemá meniny nikto.')}")
         except:
-            bot.send_message(message.chat.id, "Wrong date format – use dd.mm 😅")
+            bot.send_message(message.chat.id, "Nesprávny formát dátumu – použite dd.mm 😅")
 
     else:
         date = name_to_date.get(query.lower())
         if date:
             d, m = date.split("-")
-            bot.send_message(message.chat.id, f"{query.capitalize()} has meniny on {d}.{m}.")
+            bot.send_message(message.chat.id, f"{query.capitalize()} má meniny dňa {d}.{m}.")
         else:
-            bot.send_message(message.chat.id, "Name not found 😔")
+            bot.send_message(message.chat.id, "Meno nebolo nájdené. 😔")
 
 @bot.message_handler(func=lambda m: m.text and m.text.lower().startswith("!meniny"))
 def handle_group(message):
     key = datetime.now().strftime("%m-%d")
-    names = namedays.get(key, "No entry today.")
+    names = namedays.get(key, "Dnes nemá meniny nikto.")
     date = datetime.now().strftime("%d.%m.%Y")
-    bot.send_message(message.chat.id, f"Today ({date}): {names}")
+    bot.send_message(message.chat.id, f"Dnes ({date}): {names}")
 
-# ================= WEBHOOK =================
 @app.route("/" + TOKEN, methods=["POST"])
 def telegram_webhook():
     update = telebot.types.Update.de_json(
@@ -449,9 +444,7 @@ def telegram_webhook():
 
 @app.route("/")
 def index():
-    return "Bot is alive"
-
-# ================= RUN =================
+    return "Bot is alive and looking at % of alcohol in Padinec's blood"
 
 if os.environ.get("RENDER"):
     bot.remove_webhook()
