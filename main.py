@@ -1,9 +1,7 @@
-
-
 import os
 import flask
 import telebot
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from collections import defaultdict
 
 TOKEN = os.environ.get("TOKEN")
@@ -11,7 +9,7 @@ bot = telebot.TeleBot(TOKEN, threaded=False)
 app = flask.Flask(__name__)
 
 # ==================================================
-# namedays DICT (UNCHANGED – PASTE YOUR ORIGINAL HERE)
+# namedays DICT (UNCHANGED – YOUR FULL DATA HERE)
 # ==================================================
 
 namedays = {
@@ -393,47 +391,39 @@ namedays = {
     "30-December": "Silvester"
 }
 
+
 # ======================
 # MONTH KEY NAMES
 # ======================
 MONTH_KEY_NAMES = {
-    "01": "Januar",
-    "02": "Februar",
-    "03": "Marec",
-    "04": "April",
-    "05": "Maj",
-    "06": "Jun",
-    "07": "Jul",
-    "08": "August",
-    "09": "September",
-    "10": "Oktober",
-    "11": "November",
-    "12": "December",
+    "01": "Januar", "02": "Februar", "03": "Marec", "04": "April",
+    "05": "Maj", "06": "Jun", "07": "Jul", "08": "August",
+    "09": "September", "10": "Oktober", "11": "November", "12": "December",
 }
 
 MONTH_GENITIVE = {
-    "Januar": "Januara",
-    "Februar": "Februara",
-    "Marec": "Marca",
-    "April": "Aprila",
-    "Maj": "Maja",
-    "Jun": "Juna",
-    "Jul": "Jula",
-    "August": "Avgusta",
-    "September": "Septembra",
-    "Oktober": "Oktobra",
-    "November": "Novembra",
-    "December": "Decembra",
+    "Januar": "Januara", "Februar": "Februara", "Marec": "Marca",
+    "April": "Aprila", "Maj": "Maja", "Jun": "Juna",
+    "Jul": "Jula", "August": "Avgusta", "September": "Septembra",
+    "Oktober": "Oktobra", "November": "Novembra", "December": "Decembra",
 }
+
+# ======================
+# HELPERS
+# ======================
+def split_names(names: str):
+    cleaned = names.replace(" a ", ", ").replace(" - ", ", ")
+    return [n.strip().lower() for n in cleaned.split(",") if n.strip()]
+
+def key_to_date(key: str, year: int):
+    day, month_name = key.split("-")
+    month_num = list(MONTH_KEY_NAMES.values()).index(month_name) + 1
+    return date(year, month_num, int(day))
 
 # ======================
 # NAME → DATES INDEX
 # ======================
 name_to_date = defaultdict(list)
-
-def split_names(names: str):
-    cleaned = names.replace(" a ", ", ").replace(" - ", ", ")
-    return [n.strip().lower() for n in cleaned.split(",") if n.strip()]
 
 for date_key, names in namedays.items():
     for name in split_names(names):
@@ -442,7 +432,7 @@ for date_key, names in namedays.items():
 # ======================
 # SUBSCRIPTIONS (IN-MEMORY)
 # ======================
-subscriptions = defaultdict(set)  # chat_id -> set of names (lowercase)
+subscriptions = defaultdict(set)  # chat_id -> set of lowercase names
 
 # ======================
 # HELP
@@ -455,10 +445,11 @@ def send_help(message):
         "/meniny → dnesne meniny\n"
         "/meniny 17.12 → meniny v dany datum\n"
         "/meniny Daniel → datum menin pre meno\n\n"
-        "/meniny zajtra | vcera | najblizsie\n"
+        "/meniny zajtra | vcera\n"
         "/kedy ma meniny Daniel\n\n"
         "/odoberat Meno → zvrazni meno pri meninach\n"
-        "/odhlasit Meno → zrusi sledovanie\n\n"
+        "/odhlasit Meno → zrusi sledovanie\n"
+        "/sledovane → zobrazit sledovane mena\n\n"
         "/ziveli Meno → prianie k meninam\n\n"
         "!meniny → dnesne meniny (v skupinach)"
     )
@@ -475,25 +466,24 @@ def handle_meniny(message):
     label = "Dnes"
 
     if not query or query in ["dnes", "dneska"]:
-        date = now
+        d = now
 
     elif query == "zajtra":
-        date = now + timedelta(days=1)
+        d = now + timedelta(days=1)
         label = "Zajtra"
 
     elif query == "vcera":
-        date = now - timedelta(days=1)
+        d = now - timedelta(days=1)
         label = "Vcera"
 
     elif query == "najblizsie":
-        date = now
+        d = now
         label = "Najblizsie"
         for _ in range(366):
-            key = f"{date.day:02d}-{MONTH_KEY_NAMES[date.strftime('%m')]}"
-            names = namedays.get(key, "")
-            if names and names.strip():
+            key = f"{d.day:02d}-{MONTH_KEY_NAMES[d.strftime('%m')]}"
+            if namedays.get(key, "").strip():
                 break
-            date += timedelta(days=1)
+            d += timedelta(days=1)
 
     elif any(sep in query for sep in [".", "-", "/"]):
         try:
@@ -512,31 +502,27 @@ def handle_meniny(message):
     else:
         dates = name_to_date.get(query)
         if dates:
-            formatted = []
-            for d in sorted(dates):
-                day, month = d.split("-")
-                formatted.append(f"{day}-{MONTH_GENITIVE.get(month, month)}")
-            bot.send_message(
-                message.chat.id,
-                f"{query.capitalize()} ma meniny: {', '.join(formatted)}"
-            )
+            out = []
+            for dkey in sorted(dates):
+                day, month = dkey.split("-")
+                out.append(f"{day}-{MONTH_GENITIVE.get(month, month)}")
+            bot.send_message(message.chat.id, f"{query.capitalize()} ma meniny: {', '.join(out)}")
         else:
             bot.send_message(message.chat.id, "Meno nebolo najdene. 😔")
         return
 
-    key = f"{date.day:02d}-{MONTH_KEY_NAMES[date.strftime('%m')]}"
+    key = f"{d.day:02d}-{MONTH_KEY_NAMES[d.strftime('%m')]}"
     names = namedays.get(key, "Dnes nema meniny nikto.")
 
     emoji = ""
     tracked = subscriptions.get(message.chat.id, set())
-    today_names = split_names(names)
-    if any(name in tracked for name in today_names):
+    if any(n in tracked for n in split_names(names)):
         emoji = " 🎉"
 
     bot.send_message(message.chat.id, f"{label} ({key}): {names}{emoji}")
 
 # ======================
-# KEDY MA MENINY
+# KEDY MA MENINY (DAYS UNTIL)
 # ======================
 @bot.message_handler(commands=["kedy"])
 def handle_kedy(message):
@@ -549,24 +535,37 @@ def handle_kedy(message):
         bot.send_message(message.chat.id, "Pouzi: /kedy ma meniny Meno")
         return
 
+    today = date.today()
     dates = name_to_date.get(name)
-    if dates:
-        formatted = []
-        for d in sorted(dates):
-            day, month = d.split("-")
-            formatted.append(f"{day}-{MONTH_GENITIVE.get(month, month)}")
+
+    if not dates:
+        bot.send_message(message.chat.id, "Meno nebolo najdene. 😔")
+        return
+
+    future = []
+    for key in dates:
+        d = key_to_date(key, today.year)
+        if d < today:
+            d = key_to_date(key, today.year + 1)
+        future.append(d)
+
+    next_date = min(future)
+    diff = (next_date - today).days
+
+    if diff == 0:
+        bot.send_message(message.chat.id, f"{name.capitalize()} ma dnes meniny! 🎉")
+    else:
+        key = f"{next_date.day:02d}-{MONTH_KEY_NAMES[str(next_date.month).zfill(2)]}"
         bot.send_message(
             message.chat.id,
-            f"{name.capitalize()} ma meniny: {', '.join(formatted)}"
+            f"{name.capitalize()} ma meniny o {diff} dni ({key})."
         )
-    else:
-        bot.send_message(message.chat.id, "Meno nebolo najdene. 😔")
 
 # ======================
 # SUBSCRIPTIONS
 # ======================
 @bot.message_handler(commands=["odoberat"])
-def subscribe_name(message):
+def subscribe(message):
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
         bot.send_message(message.chat.id, "Pouzi: /odoberat Meno")
@@ -576,7 +575,7 @@ def subscribe_name(message):
     bot.send_message(message.chat.id, f"Meno {name.capitalize()} je sledovane ✅")
 
 @bot.message_handler(commands=["odhlasit"])
-def unsubscribe_name(message):
+def unsubscribe(message):
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
         bot.send_message(message.chat.id, "Pouzi: /odhlasit Meno")
@@ -584,6 +583,14 @@ def unsubscribe_name(message):
     name = parts[1].strip().lower()
     subscriptions[message.chat.id].discard(name)
     bot.send_message(message.chat.id, f"Meno {name.capitalize()} uz nie je sledovane ❌")
+
+@bot.message_handler(commands=["sledovane"])
+def show_subscriptions(message):
+    names = sorted(subscriptions.get(message.chat.id, []))
+    if not names:
+        bot.send_message(message.chat.id, "Zatial nesledujes ziadne mena.")
+    else:
+        bot.send_message(message.chat.id, "Sledovane mena:\n" + ", ".join(n.capitalize() for n in names))
 
 # ======================
 # ZIVELI
@@ -607,17 +614,14 @@ def ziveli(message):
 def handle_group(message):
     now = datetime.now()
     key = f"{now.day:02d}-{MONTH_KEY_NAMES[now.strftime('%m')]}"
-    names = namedays.get(key, "Dnes nema meniny nikto.")
-    bot.send_message(message.chat.id, f"Dnes ({key}): {names}")
+    bot.send_message(message.chat.id, f"Dnes ({key}): {namedays.get(key, 'Dnes nema meniny nikto.')}")
 
 # ======================
 # WEBHOOK (UNCHANGED)
 # ======================
 @app.route("/" + TOKEN, methods=["POST"])
 def telegram_webhook():
-    update = telebot.types.Update.de_json(
-        flask.request.get_data().decode("utf-8")
-    )
+    update = telebot.types.Update.de_json(flask.request.get_data().decode("utf-8"))
     bot.process_new_updates([update])
     return "OK", 200
 
@@ -627,9 +631,7 @@ def index():
 
 if os.environ.get("RENDER"):
     bot.delete_webhook(drop_pending_updates=True)
-    bot.set_webhook(
-        url=f"https://meniny-bot.onrender.com/{TOKEN}"
-    )
+    bot.set_webhook(url=f"https://meniny-bot.onrender.com/{TOKEN}")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
