@@ -1,11 +1,11 @@
-import telebot
-import flask
 import os
+import flask
+import telebot
 from datetime import datetime
+from collections import defaultdict
 
-TOKEN = os.environ["TOKEN"]
-
-bot = telebot.TeleBot(TOKEN, threaded=False)
+TOKEN = os.environ.get("TOKEN")
+bot = telebot.TeleBot(TOKEN)
 app = flask.Flask(__name__)
 
 
@@ -392,12 +392,32 @@ namedays = {
 
 
 
-name_to_date = {}
+# ======================
+# MONTH NAME MAPPING
+# ======================
+MONTH_NAMES = {
+    "01": "January", "02": "February", "03": "March", "04": "April",
+    "05": "May", "06": "June", "07": "July", "08": "August",
+    "09": "September", "10": "October", "11": "November", "12": "December"
+}
+
+def format_date(date_key):
+    month, day = date_key.split("-")
+    return f"{day}-{MONTH_NAMES[month]}"
+
+# ======================
+# NAME → DATES INDEX
+# ======================
+name_to_date = defaultdict(list)
+
 for date, names in namedays.items():
     cleaned = names.replace(" a ", ", ").replace(" - ", ", ")
     for name in [n.strip() for n in cleaned.split(",") if n.strip()]:
-        name_to_date[name.lower()] = date
+        name_to_date[name.lower()].append(date)
 
+# ======================
+# COMMANDS
+# ======================
 @bot.message_handler(commands=["start", "help"])
 def send_help(message):
     bot.send_message(
@@ -414,36 +434,60 @@ def handle_meniny(message):
     args = message.text.split(maxsplit=1)
     query = args[1].strip() if len(args) > 1 else ""
 
-    if not query or query.lower() in ["dnes", "dnes", "dneska"]:
+    # TODAY
+    if not query or query.lower() in ["dnes", "dneska"]:
         key = datetime.now().strftime("%m-%d")
         names = namedays.get(key, "Dnes nemá meniny nikto.")
-        date = datetime.now().strftime("%d.%m.%Y")
+        now = datetime.now()
+        date = f"{now.day}-{MONTH_NAMES[now.strftime('%m')]}"
         bot.send_message(message.chat.id, f"Dnes ({date}): {names}")
 
+    # DATE QUERY
     elif any(sep in query for sep in [".", "-", "/"]):
         try:
             cleaned = query.replace("/", ".").replace("-", ".")
             day, month = cleaned.split(".")[:2]
             key = f"{month.zfill(2)}-{day.zfill(2)}"
-            bot.send_message(message.chat.id, f"{query}: {namedays.get(key, 'V tento dátum nemá meniny nikto.')}")
+            formatted = f"{day.zfill(2)}-{MONTH_NAMES[month.zfill(2)]}"
+            bot.send_message(
+                message.chat.id,
+                f"{formatted}: {namedays.get(key, 'V tento dátum nemá meniny nikto.')}"
+            )
         except:
-            bot.send_message(message.chat.id, "Nesprávny formát dátumu – použite dd.mm 😅")
+            bot.send_message(
+                message.chat.id,
+                "Nesprávny formát dátumu – použite dd.mm 😅"
+            )
 
+    # NAME QUERY
     else:
-        date = name_to_date.get(query.lower())
-        if date:
-            d, m = date.split("-")
-            bot.send_message(message.chat.id, f"{query.capitalize()} má meniny dňa {d}.{m}.")
+        dates = name_to_date.get(query.lower())
+        if dates:
+            formatted = ", ".join(format_date(d) for d in sorted(dates))
+            bot.send_message(
+                message.chat.id,
+                f"{query.capitalize()} má meniny: {formatted}"
+            )
         else:
-            bot.send_message(message.chat.id, "Meno nebolo nájdené. 😔")
+            bot.send_message(
+                message.chat.id,
+                "Meno nebolo nájdené. 😔"
+            )
 
+# ======================
+# GROUP COMMAND
+# ======================
 @bot.message_handler(func=lambda m: m.text and m.text.lower().startswith("!meniny"))
 def handle_group(message):
     key = datetime.now().strftime("%m-%d")
     names = namedays.get(key, "Dnes nemá meniny nikto.")
-    date = datetime.now().strftime("%d.%m.%Y")
+    now = datetime.now()
+    date = f"{now.day}-{MONTH_NAMES[now.strftime('%m')]}"
     bot.send_message(message.chat.id, f"Dnes ({date}): {names}")
 
+# ======================
+# WEBHOOK
+# ======================
 @app.route("/" + TOKEN, methods=["POST"])
 def telegram_webhook():
     update = telebot.types.Update.de_json(
@@ -452,10 +496,9 @@ def telegram_webhook():
     bot.process_new_updates([update])
     return "OK", 200
 
-
 @app.route("/")
 def index():
-    return "Bot is alive and looking at % of alcohol in Padinec's blood"
+    return "Bot is alive"
 
 if os.environ.get("RENDER"):
     bot.remove_webhook()
