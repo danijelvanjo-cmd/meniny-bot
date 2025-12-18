@@ -411,6 +411,21 @@ MONTH_KEY_NAMES = {
     "12": "December",
 }
 
+MONTH_GENITIVE = {
+    "Januar": "Januara",
+    "Februar": "Februara",
+    "Marec": "Marca",
+    "April": "Aprila",
+    "Maj": "Maja",
+    "Jun": "Juna",
+    "Jul": "Jula",
+    "August": "Avgusta",
+    "September": "Septembra",
+    "Oktober": "Oktobra",
+    "November": "Novembra",
+    "December": "Decembra",
+}
+
 # ======================
 # NAME → DATES INDEX
 # ======================
@@ -469,15 +484,22 @@ def handle_meniny(message):
     else:
         dates = name_to_date.get(query.lower())
         if dates:
+            formatted = []
+            for d in sorted(dates):
+                day, month = d.split("-")
+                formatted.append(f"{day}-{MONTH_GENITIVE.get(month, month)}")
+
             bot.send_message(
                 message.chat.id,
-                f"{query.capitalize()} má meniny: {', '.join(sorted(dates))}"
+                f"{query.capitalize()} má meniny: {', '.join(formatted)}"
             )
         else:
             bot.send_message(
                 message.chat.id,
                 "Meno nebolo nájdené. 😔"
             )
+
+
 
 
 # ======================
