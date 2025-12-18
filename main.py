@@ -5,7 +5,7 @@ from datetime import datetime
 from collections import defaultdict
 
 TOKEN = os.environ.get("TOKEN")
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot(TOKEN, threaded=False)
 app = flask.Flask(__name__)
 
 
