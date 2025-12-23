@@ -33,9 +33,9 @@ MONTH_GENITIVE = {
 WEEKDAYS = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"]
 
 FALLBACK_TEXT = (
-    "Pôvod: neznámy\n"
-    "Význam: Význam tohto mena sa v kronikách nenašiel. "
-    "Možno je čas zapísať ho do histórie práve ty 🙂"
+    "pôvod: neznámy\n"
+    "význam: význam tohto mena sa v kronikách nenašiel. "
+    "možno je čas zapísať ho do histórie práve ty 🙂"
 )
 
 def split_names(names):
@@ -59,7 +59,7 @@ def get_single_name_meaning(names_str):
     meno = mena[0]
     data = NAME_MEANINGS.get(meno)
     if data:
-        return f"\nPôvod: {data['origin']}\nVýznam: {data['meaning']}"
+        return f"\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
     return f"\n{FALLBACK_TEXT}"
 
 name_to_date = defaultdict(list)
@@ -72,20 +72,19 @@ normalized_names = {normalize_name(name): name for name in name_to_date.keys()}
 
 def help_text():
     return (
-        "Meninový bot\n\n"
-        "📅 MENINY\n"
+        "Meninový bot 🎉\n\n"
+        "📅 meniny\n"
         "/meniny – dnešné meniny\n"
         "/meniny zajtra – zajtrajšie meniny\n"
         "/meniny vcera – včerajšie meniny\n"
         "/meniny 17-01 – meniny k dátumu\n"
         "/meniny tyzden – meniny na 7 dní dopredu\n\n"
-        "🔎 PODĽA MENA\n"
+        "🔎 podľa mena\n"
         "/meniny Daniel – meniny\n"
-        "/meaning Daniel – význam mena\n\n"
-        "👥 SKUPINY\n"
-        "!meniny – dnešné meniny\n\n"
-        "ℹ️ Tip:\n"
-        "Nezáleží na diakritike ani drobných preklepoch."
+        "/vyznam Daniel – význam mena\n\n"
+        "👥 skupiny\n"
+        "ℹ️ tip\n"
+        "Tento dátum nemá meniny – možno je čas zapísať ho do histórie 🙂"
     )
 
 @bot.message_handler(commands=["start", "help", "pomoc"])
@@ -103,9 +102,12 @@ def handle_meniny(message):
         for i in range(7):
             d = dnes + timedelta(days=i)
             key = f"{d.day:02d}-{MONTH_KEY_NAMES[str(d.month).zfill(2)]}"
-            mena = namedays.get(key, "Nikto")
+            mena = namedays.get(key)
             wd = WEEKDAYS[d.weekday()]
-            vystup.append(f"{wd} {d.day}.{d.month}. – {mena}")
+            if not mena:
+                vystup.append(f"{wd} {d.day}.{d.month}. – bez mien")
+            else:
+                vystup.append(f"{wd} {d.day}.{d.month}. – {mena}")
         bot.send_message(message.chat.id, "\n".join(vystup))
         return
 
@@ -125,7 +127,10 @@ def handle_meniny(message):
             cleaned = query.replace("/", ".").replace("-", ".")
             den, mesiac = cleaned.split(".")[:2]
             key = f"{den.zfill(2)}-{MONTH_KEY_NAMES[mesiac.zfill(2)]}"
-            mena = namedays.get(key, "Nikto")
+            mena = namedays.get(key)
+            if not mena:
+                bot.send_message(message.chat.id, "Tento dátum nemá meniny.")
+                return
             vyznam = get_single_name_meaning(mena)
             bot.send_message(message.chat.id, f"{key}: {mena}{vyznam}")
             return
@@ -149,7 +154,7 @@ def handle_meniny(message):
             vystup.append(f"{den}-{MONTH_GENITIVE.get(mesiac, mesiac)}")
         data = NAME_MEANINGS.get(query)
         if data:
-            vyznam = f"\nPôvod: {data['origin']}\nVýznam: {data['meaning']}"
+            vyznam = f"\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
         else:
             vyznam = f"\n{FALLBACK_TEXT}"
         bot.send_message(
@@ -159,7 +164,10 @@ def handle_meniny(message):
         return
 
     key = f"{d.day:02d}-{MONTH_KEY_NAMES[d.strftime('%m')]}"
-    mena = namedays.get(key, "Nikto")
+    mena = namedays.get(key)
+    if not mena:
+        bot.send_message(message.chat.id, "Tento dátum nemá meniny.")
+        return
     vyznam = get_single_name_meaning(mena)
     bot.send_message(message.chat.id, f"{label} ({key}): {mena}{vyznam}")
 
@@ -180,7 +188,7 @@ def meaning_cmd(message):
     if data:
         bot.send_message(
             message.chat.id,
-            f"{meno.capitalize()}\nPôvod: {data['origin']}\nVýznam: {data['meaning']}"
+            f"{meno.capitalize()}\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
         )
     else:
         bot.send_message(message.chat.id, f"{meno.capitalize()}\n{FALLBACK_TEXT}")
@@ -189,7 +197,10 @@ def meaning_cmd(message):
 def group_meniny(message):
     now = datetime.now()
     key = f"{now.day:02d}-{MONTH_KEY_NAMES[now.strftime('%m')]}"
-    mena = namedays.get(key, "Nikto")
+    mena = namedays.get(key)
+    if not mena:
+        bot.send_message(message.chat.id, "Tento dátum nemá meniny.")
+        return
     bot.send_message(message.chat.id, f"Dnes ({key}): {mena}")
 
 @app.route("/" + TOKEN, methods=["POST"])
