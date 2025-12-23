@@ -77,7 +77,7 @@ def help_text():
         "/meniny – dnešné meniny\n"
         "/meniny zajtra – zajtrajšie meniny\n"
         "/meniny vcera – včerajšie meniny\n"
-        "/meniny 17-01 – meniny k dátumu\n"
+        "/meniny 13-07 – meniny k dátumu\n"
         "/meniny tyzden – meniny na 7 dní dopredu\n\n"
         "🔎 podľa mena\n"
         "/meniny Daniel – meniny\n"
