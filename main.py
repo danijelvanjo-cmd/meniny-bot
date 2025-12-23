@@ -73,17 +73,17 @@ normalized_names = {normalize_name(name): name for name in name_to_date.keys()}
 def help_text():
     return (
         "Meninový bot 🎉\n\n"
-        "📅 meniny\n"
+        "📅 Meniny\n"
         "/meniny – dnešné meniny\n"
         "/meniny zajtra – zajtrajšie meniny\n"
         "/meniny vcera – včerajšie meniny\n"
         "/meniny 13-07 – meniny k dátumu\n"
         "/meniny tyzden – meniny na 7 dní dopredu\n\n"
-        "🔎 podľa mena\n"
+        "🔎 Podľa mena\n"
         "/meniny Daniel – meniny\n"
         "/vyznam Daniel – význam mena\n\n"
-        "ℹ️ tip\n"
-        "Tento dátum nemá meniny – možno je čas zapísať ho do histórie 🙂"
+        "ℹ️ Návrh\n"
+        "„Ak tvoje meno nemá svoj význam, možno by si s ním mohol/mohla napísať vlastný príbeh.“ ✨📖"
     )
 
 @bot.message_handler(commands=["start", "help", "pomoc"])
