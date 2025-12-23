@@ -90,15 +90,22 @@ for date_key, names in namedays.items():
 def help_cmd(message):
     bot.send_message(
         message.chat.id,
-        "📅 Name Days Bot\n\n"
-        "/meniny → today\n"
-        "/meniny zajtra | vcera\n"
-        "/meniny DD-MM\n"
-        "/meniny tyzden → next 7 days\n"
-        "/meniny Name → dates + meaning\n\n"
-        "/meaning Name → meaning only\n\n"
-        "!meniny → group shortcut"
+        "Meninový bot 😊\n\n"
+        "📅 Meniny:\n"
+        "/meniny – dnešné meniny\n"
+        "/meniny zajtra – zajtrajšie meniny\n"
+        "/meniny vcera – včerajšie meniny\n"
+        "/meniny 17-01 – meniny k dátumu\n"
+        "/meniny tyzden – meniny na 7 dní dopredu\n\n"
+        "🔎 Vyhľadávanie podľa mena:\n"
+        "/meniny Daniel – kedy má meno meniny + význam mena\n"
+        "/meaning Daniel – význam mena\n\n"
+        "👥 Skupiny:\n"
+        "!meniny – dnešné meniny v skupine\n\n"
+        "ℹ️ Tip:\n"
+        "Ak význam mena nepoznáme, možno je čas, aby si ho zapísal do histórie 😉"
     )
+
 
 # =========================
 # MENINY
