@@ -59,8 +59,8 @@ def get_single_name_meaning(names_str):
     meno = mena[0]
     data = NAME_MEANINGS.get(meno)
     if data:
-        return f"\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
-    return f"\n{FALLBACK_TEXT}"
+        return f"\n\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
+    return f"\n\n{FALLBACK_TEXT}"
 
 name_to_date = defaultdict(list)
 
@@ -153,9 +153,9 @@ def handle_meniny(message):
             vystup.append(f"{den}-{MONTH_GENITIVE.get(mesiac, mesiac)}")
         data = NAME_MEANINGS.get(query)
         if data:
-            vyznam = f"\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
+            vyznam = f"\n\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
         else:
-            vyznam = f"\n{FALLBACK_TEXT}"
+            vyznam = f"\n\n{FALLBACK_TEXT}"
         bot.send_message(
             message.chat.id,
             f"{query.capitalize()} má meniny: {', '.join(vystup)}{vyznam}"
@@ -170,27 +170,33 @@ def handle_meniny(message):
     vyznam = get_single_name_meaning(mena)
     bot.send_message(message.chat.id, f"{label} ({key}): {mena}{vyznam}")
 
-@bot.message_handler(commands=["meaning"])
+@bot.message_handler(commands=["meaning", "vyznam"])
 def meaning_cmd(message):
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
-        bot.send_message(message.chat.id, "Použitie: /meaning Meno")
+        bot.send_message(message.chat.id, "Použitie: /vyznam Meno")
         return
+
     meno = parts[1].strip().lower()
     norm = normalize_name(meno)
     data = NAME_MEANINGS.get(meno)
+
     if not data:
         podobne = find_similar_name(norm, [normalize_name(n) for n in NAME_MEANINGS.keys()])
         if podobne:
             meno = next(k for k in NAME_MEANINGS.keys() if normalize_name(k) == podobne)
             data = NAME_MEANINGS.get(meno)
+
     if data:
         bot.send_message(
             message.chat.id,
-            f"{meno.capitalize()}\n\n Pôvod: {data['origin']}\n\n Význam: {data['meaning']}"
+            f"{meno.capitalize()}\n\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
         )
     else:
-        bot.send_message(message.chat.id, f"{meno.capitalize()}\n{FALLBACK_TEXT}")
+        bot.send_message(
+            message.chat.id,
+            f"{meno.capitalize()}\n\n{FALLBACK_TEXT}"
+        )
 
 @bot.message_handler(func=lambda m: m.text and m.text.lower().startswith("!meniny"))
 def group_meniny(message):
@@ -219,4 +225,4 @@ if os.environ.get("RENDER"):
     bot.set_webhook(url=f"https://meniny-bot.onrender.com/{TOKEN}")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
