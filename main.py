@@ -82,7 +82,6 @@ def help_text():
         "🔎 podľa mena\n"
         "/meniny Daniel – meniny\n"
         "/vyznam Daniel – význam mena\n\n"
-        "👥 skupiny\n"
         "ℹ️ tip\n"
         "Tento dátum nemá meniny – možno je čas zapísať ho do histórie 🙂"
     )
