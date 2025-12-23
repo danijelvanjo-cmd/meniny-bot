@@ -83,7 +83,7 @@ def help_text():
         "/meniny Daniel – meniny\n"
         "/vyznam Daniel – význam mena\n\n"
         "ℹ️ Návrh\n"
-        "„Ak tvoje meno nemá svoj význam, možno by si s ním mohol/mohla napísať vlastný príbeh.“ ✨📖"
+        "„Ak tvoje meno nemá svoj význam, možno by si s ním mohol/mohla napísať vlastný príbeh.“ 📖"
     )
 
 @bot.message_handler(commands=["start", "help", "pomoc"])
@@ -187,7 +187,7 @@ def meaning_cmd(message):
     if data:
         bot.send_message(
             message.chat.id,
-            f"{meno.capitalize()}\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
+            f"{meno.capitalize()}\n\n Pôvod: {data['origin']}\n\n Význam: {data['meaning']}"
         )
     else:
         bot.send_message(message.chat.id, f"{meno.capitalize()}\n{FALLBACK_TEXT}")
