@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, date
 from collections import defaultdict
 
 # =========================
-# CONFIG
+# KONFIGURÁCIA
 # =========================
 
 TOKEN = os.environ.get("TOKEN")
@@ -14,7 +14,7 @@ bot = telebot.TeleBot(TOKEN, threaded=False)
 app = flask.Flask(__name__)
 
 # =========================
-# LOAD DATA FILES
+# NAČÍTANIE DÁT
 # =========================
 
 with open("names.json", "r", encoding="utf-8") as f:
@@ -24,7 +24,7 @@ with open("namedays.json", "r", encoding="utf-8") as f:
     NAME_MEANINGS = json.load(f)
 
 # =========================
-# CONSTANTS
+# KONŠTANTY
 # =========================
 
 MONTH_KEY_NAMES = {
@@ -42,14 +42,14 @@ MONTH_GENITIVE = {
 
 WEEKDAYS = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"]
 
-FALLBACK_MEANING = (
-    "Origin: unknown\n"
-    "Meaning: The origin of this name is unknown. "
-    "Maybe it’s time for you to make history with it."
+FALLBACK_TEXT = (
+    "Pôvod: neznámy\n"
+    "Význam: Význam tohto mena sa v kronikách nenašiel. "
+    "Možno je čas zapísať ho do histórie práve ty 🙂"
 )
 
 # =========================
-# HELPERS
+# POMOCNÉ FUNKCIE
 # =========================
 
 def split_names(names: str):
@@ -61,19 +61,19 @@ def split_names(names: str):
     return [n.strip().lower() for n in cleaned.split(",") if n.strip()]
 
 def get_first_name_meaning(names_str: str):
-    names = split_names(names_str)
-    if not names:
+    mena = split_names(names_str)
+    if not mena:
         return ""
 
-    first = names[0]
-    data = NAME_MEANINGS.get(first)
+    prve = mena[0]
+    data = NAME_MEANINGS.get(prve)
 
     if data:
-        return f"\nOrigin: {data['origin']}\nMeaning: {data['meaning']}"
-    return f"\n{FALLBACK_MEANING}"
+        return f"\nPôvod: {data['origin']}\nVýznam: {data['meaning']}"
+    return f"\n{FALLBACK_TEXT}"
 
 # =========================
-# BUILD NAME → DATE INDEX
+# INDEX MENO → DÁTUM
 # =========================
 
 name_to_date = defaultdict(list)
@@ -83,7 +83,7 @@ for date_key, names in namedays.items():
         name_to_date[name].append(date_key)
 
 # =========================
-# COMMANDS
+# START / HELP
 # =========================
 
 @bot.message_handler(commands=["start", "help"])
@@ -106,7 +106,6 @@ def help_cmd(message):
         "Ak význam mena nepoznáme, možno je čas, aby si ho zapísal do histórie 😉"
     )
 
-
 # =========================
 # MENINY
 # =========================
@@ -116,124 +115,124 @@ def handle_meniny(message):
     parts = message.text.split(maxsplit=1)
     query = parts[1].strip().lower() if len(parts) > 1 else ""
 
-    # ---- 7 DAYS AHEAD ----
+    # ---- MENINY NA TÝŽDEŇ ----
     if query in ["tyzden", "týždeň", "7", "7dni"]:
-        today = date.today()
-        lines = []
+        dnes = date.today()
+        vystup = []
 
         for i in range(7):
-            d = today + timedelta(days=i)
+            d = dnes + timedelta(days=i)
             key = f"{d.day:02d}-{MONTH_KEY_NAMES[str(d.month).zfill(2)]}"
-            names = namedays.get(key, "Nobody")
+            mena = namedays.get(key, "Nikto")
             wd = WEEKDAYS[d.weekday()]
-            lines.append(f"{wd} {d.day}.{d.month}. – {names}")
+            vystup.append(f"{wd} {d.day}.{d.month}. – {mena}")
 
-        bot.send_message(message.chat.id, "\n".join(lines))
+        bot.send_message(message.chat.id, "\n".join(vystup))
         return
 
     now = datetime.now()
-    label = "Today"
+    label = "Dnes"
 
-    # ---- TODAY / TOMORROW / YESTERDAY ----
-    if not query or query in ["dnes", "today"]:
+    # ---- DNES / ZAJTRA / VCERA ----
+    if not query or query == "dnes":
         d = now
     elif query == "zajtra":
         d = now + timedelta(days=1)
-        label = "Tomorrow"
+        label = "Zajtra"
     elif query == "vcera":
         d = now - timedelta(days=1)
-        label = "Yesterday"
+        label = "Včera"
 
-    # ---- DATE LOOKUP ----
+    # ---- DÁTUM ----
     elif any(sep in query for sep in [".", "-", "/"]):
         try:
             cleaned = query.replace("/", ".").replace("-", ".")
-            day, month = cleaned.split(".")[:2]
-            key = f"{day.zfill(2)}-{MONTH_KEY_NAMES[month.zfill(2)]}"
-            names = namedays.get(key, "Nobody")
-            meaning = get_first_name_meaning(names)
-            bot.send_message(message.chat.id, f"{key}: {names}{meaning}")
+            den, mesiac = cleaned.split(".")[:2]
+            key = f"{den.zfill(2)}-{MONTH_KEY_NAMES[mesiac.zfill(2)]}"
+            mena = namedays.get(key, "Nikto")
+            vyznam = get_first_name_meaning(mena)
+            bot.send_message(message.chat.id, f"{key}: {mena}{vyznam}")
             return
         except:
-            bot.send_message(message.chat.id, "Invalid date format 😅")
+            bot.send_message(message.chat.id, "Zlý formát dátumu 😅")
             return
 
-    # ---- NAME LOOKUP ----
+    # ---- MENO ----
     else:
-        dates = name_to_date.get(query)
-        if not dates:
-            bot.send_message(message.chat.id, "Name not found 😕")
+        datumy = name_to_date.get(query)
+        if not datumy:
+            bot.send_message(message.chat.id, "Toto meno sa v kalendári nenašlo 😕")
             return
 
-        out = []
-        for dkey in sorted(dates):
-            day, month = dkey.split("-")
-            out.append(f"{day}-{MONTH_GENITIVE.get(month, month)}")
+        vystup = []
+        for dkey in sorted(datumy):
+            den, mesiac = dkey.split("-")
+            vystup.append(f"{den}-{MONTH_GENITIVE.get(mesiac, mesiac)}")
 
         data = NAME_MEANINGS.get(query)
         if data:
-            meaning = f"\nOrigin: {data['origin']}\nMeaning: {data['meaning']}"
+            vyznam = f"\nPôvod: {data['origin']}\nVýznam: {data['meaning']}"
         else:
-            meaning = f"\n{FALLBACK_MEANING}"
+            vyznam = f"\n{FALLBACK_TEXT}"
 
         bot.send_message(
             message.chat.id,
-            f"{query.capitalize()} name days: {', '.join(out)}{meaning}"
+            f"{query.capitalize()} má meniny: {', '.join(vystup)}{vyznam}"
         )
         return
 
     key = f"{d.day:02d}-{MONTH_KEY_NAMES[d.strftime('%m')]}"
-    names = namedays.get(key, "Nobody")
-    meaning = get_first_name_meaning(names)
+    mena = namedays.get(key, "Nikto")
+    vyznam = get_first_name_meaning(mena)
     bot.send_message(
         message.chat.id,
-        f"{label} ({key}): {names}{meaning}"
+        f"{label} ({key}): {mena}{vyznam}"
     )
 
 # =========================
-# MEANING ONLY
+# VÝZNAM MENA
 # =========================
 
 @bot.message_handler(commands=["meaning"])
 def meaning_cmd(message):
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
-        bot.send_message(message.chat.id, "Usage: /meaning Name")
+        bot.send_message(message.chat.id, "Použitie: /meaning Meno")
         return
 
-    name = parts[1].strip().lower()
-    data = NAME_MEANINGS.get(name)
+    meno = parts[1].strip().lower()
+    data = NAME_MEANINGS.get(meno)
 
     if data:
         bot.send_message(
             message.chat.id,
-            f"{name.capitalize()}\n"
-            f"Origin: {data['origin']}\n"
-            f"Meaning: {data['meaning']}"
+            f"{meno.capitalize()}\n"
+            f"Pôvod: {data['origin']}\n"
+            f"Význam: {data['meaning']}"
         )
     else:
         bot.send_message(
             message.chat.id,
-            f"{name.capitalize()}\n{FALLBACK_MEANING}"
+            f"{meno.capitalize()}\n{FALLBACK_TEXT}"
         )
 
 # =========================
-# GROUP SHORTCUT
+# SKUPINY
 # =========================
 
 @bot.message_handler(func=lambda m: m.text and m.text.lower().startswith("!meniny"))
 def group_meniny(message):
     now = datetime.now()
     key = f"{now.day:02d}-{MONTH_KEY_NAMES[now.strftime('%m')]}"
-    names = namedays.get(key, "Nobody")
-    meaning = get_first_name_meaning(names)
+    mena = namedays.get(key, "Nikto")
+    vyznam = get_first_name_meaning(mena)
     bot.send_message(
         message.chat.id,
-        f"Today ({key}): {names}{meaning}"
+        f"Dnes ({key}): {mena}{vyznam}"
     )
 
 # =========================
-# WEBHOOK (UNCHANGED)
+# WEBHOOK (NEZMENENÝ)
 # =========================
 
 @app.route("/" + TOKEN, methods=["POST"])
@@ -246,7 +245,7 @@ def telegram_webhook():
 
 @app.route("/")
 def index():
-    return "Bot is alive"
+    return "Bot beží"
 
 if os.environ.get("RENDER"):
     bot.delete_webhook(drop_pending_updates=True)
