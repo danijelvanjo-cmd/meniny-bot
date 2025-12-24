@@ -30,6 +30,22 @@ MONTH_GENITIVE = {
     "Oktober": "Oktobra", "November": "Novembra", "December": "Decembra",
 }
 
+# ✅ ADDITION
+MONTH_ABBR = {
+    "Januar": "JAN",
+    "Februar": "FEB",
+    "Marec": "MAR",
+    "April": "APR",
+    "Maj": "MAJ",
+    "Jun": "JUN",
+    "Jul": "JUL",
+    "August": "AUG",
+    "September": "SEP",
+    "Oktober": "OKT",
+    "November": "NOV",
+    "December": "DEC",
+}
+
 WEEKDAYS = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"]
 
 FALLBACK_TEXT = (
@@ -69,6 +85,39 @@ for date_key, names in namedays.items():
         name_to_date[name].append(date_key)
 
 normalized_names = {normalize_name(name): name for name in name_to_date.keys()}
+
+# ✅ ADDITION
+def next_nameday_info(name):
+    today = date.today()
+    year = today.year
+
+    dates = name_to_date.get(name)
+    if not dates:
+        return None, None
+
+    upcoming = []
+
+    for dkey in dates:
+        day, month = dkey.split("-")
+        month_num = next(k for k, v in MONTH_KEY_NAMES.items() if v == month)
+
+        nd = date(year, int(month_num), int(day))
+        if nd < today:
+            nd = date(year + 1, int(month_num), int(day))
+
+        upcoming.append(nd)
+
+    next_day = min(upcoming)
+    delta = (next_day - today).days
+
+    if delta == 0:
+        countdown = "dnes 🎉"
+    elif delta == 1:
+        countdown = "zajtra"
+    else:
+        countdown = f"o {delta} dní"
+
+    return next_day, countdown
 
 def help_text():
     return (
@@ -188,9 +237,19 @@ def meaning_cmd(message):
             data = NAME_MEANINGS.get(meno)
 
     if data:
+        nd, countdown = next_nameday_info(meno)
+        date_line = ""
+        if nd:
+            month_name = MONTH_KEY_NAMES[f"{nd.month:02d}"]
+            abbr = MONTH_ABBR.get(month_name, month_name)
+            date_line = f"\n\nmeniny: {nd.day:02d} {abbr} ({countdown})"
+
         bot.send_message(
             message.chat.id,
-            f"{meno.capitalize()}\n\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
+            f"{meno.capitalize()}"
+            f"{date_line}\n\n"
+            f"pôvod: {data['origin']}\n"
+            f"význam: {data['meaning']}"
         )
     else:
         bot.send_message(
