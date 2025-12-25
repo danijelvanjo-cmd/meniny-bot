@@ -1,5 +1,6 @@
 import os
 import json
+import random
 import flask
 import telebot
 import difflib
@@ -17,41 +18,41 @@ with open("names.json", "r", encoding="utf-8") as f:
 with open("namedays.json", "r", encoding="utf-8") as f:
     NAME_MEANINGS = json.load(f)
 
+def _safe_load_json(path, default):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+RANDOM_MEANINGS = _safe_load_json("random.json", {})
+GIFT_WISHES = _safe_load_json("gift.json", [])
+
 MONTH_KEY_NAMES = {
-    "01": "Januar", "02": "Februar", "03": "Marec", "04": "April",
-    "05": "Maj", "06": "Jun", "07": "Jul", "08": "August",
-    "09": "September", "10": "Oktober", "11": "November", "12": "December",
+    "01": "Január", "02": "Február", "03": "Marec", "04": "Apríl",
+    "05": "Máj", "06": "Jún", "07": "Júl", "08": "August",
+    "09": "September", "10": "Október", "11": "November", "12": "December",
 }
 
 MONTH_GENITIVE = {
-    "Januar": "Januara", "Februar": "Februara", "Marec": "Marca",
-    "April": "Aprila", "Maj": "Maja", "Jun": "Juna",
-    "Jul": "Jula", "August": "Avgusta", "September": "Septembra",
-    "Oktober": "Oktobra", "November": "Novembra", "December": "Decembra",
+    "Január": "Januára", "Február": "Februára", "Marec": "Marca",
+    "Apríl": "Apríla", "Máj": "Mája", "Jún": "Júna",
+    "Júl": "Júla", "August": "Augusta", "September": "Septembra",
+    "Október": "Októbra", "November": "Novembra", "December": "Decembra",
 }
 
-# ✅ ADDITION
 MONTH_ABBR = {
-    "Januar": "JAN",
-    "Februar": "FEB",
-    "Marec": "MAR",
-    "April": "APR",
-    "Maj": "MAJ",
-    "Jun": "JUN",
-    "Jul": "JUL",
-    "August": "AUG",
-    "September": "SEP",
-    "Oktober": "OKT",
-    "November": "NOV",
-    "December": "DEC",
+    "Január": "JAN", "Február": "FEB", "Marec": "MAR", "Apríl": "APR",
+    "Máj": "MAJ", "Jún": "JUN", "Júl": "JUL", "August": "AUG",
+    "September": "SEP", "Október": "OKT", "November": "NOV", "December": "DEC",
 }
 
 WEEKDAYS = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"]
 
 FALLBACK_TEXT = (
-    "pôvod: neznámy\n"
-    "význam: význam tohto mena sa v kronikách nenašiel. "
-    "možno je čas zapísať ho do histórie práve ty 🙂"
+    "Pôvod: Neznámy\n"
+    "Význam: Význam tohto mena sa v dostupných prameňoch nenašiel. "
+    "Možno je čas zapísať ho do histórie."
 )
 
 def split_names(names):
@@ -75,50 +76,54 @@ def get_single_name_meaning(names_str):
     meno = mena[0]
     data = NAME_MEANINGS.get(meno)
     if data:
-        return f"\n\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
+        return (
+            f"\n\nPôvod: {data['origin']}\n"
+            f"Význam: {data['meaning']}"
+        )
     return f"\n\n{FALLBACK_TEXT}"
 
-name_to_date = defaultdict(list)
+def _format_meaning(name, data):
+    if not data:
+        return f"{name.capitalize()}\n\n{FALLBACK_TEXT}"
+    return (
+        f"{name.capitalize()}\n\n"
+        f"Pôvod: {data.get('origin')}\n"
+        f"Význam: {data.get('meaning')}"
+    )
 
+name_to_date = defaultdict(list)
 for date_key, names in namedays.items():
     for name in split_names(names):
         name_to_date[name].append(date_key)
 
-normalized_names = {normalize_name(name): name for name in name_to_date.keys()}
+normalized_names = {normalize_name(n): n for n in name_to_date.keys()}
 
-# ✅ ADDITION
 def next_nameday_info(name):
     today = date.today()
-    year = today.year
-
     dates = name_to_date.get(name)
     if not dates:
         return None, None
 
     upcoming = []
-
     for dkey in dates:
-        day, month = dkey.split("-")
-        month_num = next(k for k, v in MONTH_KEY_NAMES.items() if v == month)
-
-        nd = date(year, int(month_num), int(day))
+        d, m = dkey.split("-")
+        mnum = next(k for k, v in MONTH_KEY_NAMES.items() if v == m)
+        nd = date(today.year, int(mnum), int(d))
         if nd < today:
-            nd = date(year + 1, int(month_num), int(day))
-
+            nd = date(today.year + 1, int(mnum), int(d))
         upcoming.append(nd)
 
     next_day = min(upcoming)
     delta = (next_day - today).days
 
     if delta == 0:
-        countdown = "dnes 🎉"
+        countdown = "dnes"
     elif delta == 1:
         countdown = "zajtra"
     else:
         countdown = f"o {delta} dní"
 
     return next_day, countdown
-
 def help_text():
     return (
         "Meninový bot 🎉\n\n"
@@ -126,21 +131,55 @@ def help_text():
         "/meniny – dnešné meniny\n"
         "/meniny zajtra – zajtrajšie meniny\n"
         "/meniny vcera – včerajšie meniny\n"
-        "/meniny 13-07 – meniny k dátumu\n"
-        "/meniny tyzden – meniny na 7 dní dopredu\n\n"
+        "/meniny tyzden – meniny na 7 dní dopredu\n"
+        "/meniny 13-07 – meniny k dátumu\n\n"
         "🔎 Podľa mena\n"
         "/meniny Daniel – meniny\n"
         "/vyznam Daniel – význam mena\n\n"
-        "ℹ️ Návrh\n"
-        "„Ak tvoje meno nemá svoj význam, možno by si s ním mohol/mohla napísať vlastný príbeh.“ 📖"
+        "🎲 Doplnky\n"
+        "/random – náhodné meno\n"
+        "/gift – malé prianie\n\n"
+        "ℹ️ Môj účel\n"
+        "/meninar"
     )
+
 
 @bot.message_handler(commands=["start", "help", "pomoc"])
 def help_cmd(message):
     bot.send_message(message.chat.id, help_text())
 
+@bot.message_handler(commands=["meninar"])
+def about_cmd(message):
+    bot.send_message(
+        message.chat.id,
+        "👋 Ahoj!\n\n"
+        "Som meninový bot 🎉\n"
+        "Pomáham rýchlo zistiť, kto má meniny, kedy sú tie tvoje "
+        "a čo tvoje meno znamená.\n\n"
+        "Skús napríklad:\n"
+        "• /meniny\n"
+        "• /meniny zajtra\n"
+        "• /vyznam tvoje_meno\n\n"
+        "Alebo len klikni na moje meno a objav, čo všetko viem 😊"
+    )
+
+
 @bot.message_handler(commands=["meniny"])
 def handle_meniny(message):
+    now = datetime.now()
+
+    if now.month == 12 and now.day == 25:
+        bot.send_message(
+            message.chat.id,
+            "🎄 Veselé Vianoce! Prajeme pokoj, radosť a pohodu."
+        )
+
+    if now.month == 1 and now.day == 1:
+        bot.send_message(
+            message.chat.id,
+            "🎆 Šťastný nový rok! Nech je plný zdravia a úspechov."
+        )
+
     parts = message.text.split(maxsplit=1)
     query = parts[1].strip().lower() if len(parts) > 1 else ""
 
@@ -150,65 +189,22 @@ def handle_meniny(message):
         for i in range(7):
             d = dnes + timedelta(days=i)
             key = f"{d.day:02d}-{MONTH_KEY_NAMES[str(d.month).zfill(2)]}"
-            mena = namedays.get(key)
-            wd = WEEKDAYS[d.weekday()]
-            if not mena:
-                vystup.append(f"{wd} {d.day}.{d.month}. – bez mien")
-            else:
-                vystup.append(f"{wd} {d.day}.{d.month}. – {mena}")
+            mena = namedays.get(key, "—")
+            vystup.append(f"{WEEKDAYS[d.weekday()]} {d.day}.{d.month}. – {mena}")
         bot.send_message(message.chat.id, "\n".join(vystup))
         return
 
-    now = datetime.now()
-    label = "Dnes"
-
     if not query or query == "dnes":
         d = now
+        label = "Dnes"
     elif query == "zajtra":
         d = now + timedelta(days=1)
         label = "Zajtra"
     elif query == "vcera":
         d = now - timedelta(days=1)
         label = "Včera"
-    elif any(sep in query for sep in [".", "-", "/"]):
-        try:
-            cleaned = query.replace("/", ".").replace("-", ".")
-            den, mesiac = cleaned.split(".")[:2]
-            key = f"{den.zfill(2)}-{MONTH_KEY_NAMES[mesiac.zfill(2)]}"
-            mena = namedays.get(key)
-            if not mena:
-                bot.send_message(message.chat.id, "Tento dátum nemá meniny.")
-                return
-            vyznam = get_single_name_meaning(mena)
-            bot.send_message(message.chat.id, f"{key}: {mena}{vyznam}")
-            return
-        except:
-            bot.send_message(message.chat.id, "Zlý formát dátumu 😅")
-            return
     else:
-        norm = normalize_name(query)
-        real_name = name_to_date.get(query)
-        if not real_name:
-            podobne = find_similar_name(norm, normalized_names.keys())
-            if podobne:
-                query = normalized_names[podobne]
-                real_name = name_to_date.get(query)
-        if not real_name:
-            bot.send_message(message.chat.id, "Toto meno sa v kalendári nenašlo 😕")
-            return
-        vystup = []
-        for dkey in sorted(real_name):
-            den, mesiac = dkey.split("-")
-            vystup.append(f"{den}-{MONTH_GENITIVE.get(mesiac, mesiac)}")
-        data = NAME_MEANINGS.get(query)
-        if data:
-            vyznam = f"\n\npôvod: {data['origin']}\nvýznam: {data['meaning']}"
-        else:
-            vyznam = f"\n\n{FALLBACK_TEXT}"
-        bot.send_message(
-            message.chat.id,
-            f"{query.capitalize()} má meniny: {', '.join(vystup)}{vyznam}"
-        )
+        bot.send_message(message.chat.id, "Neznámy príkaz.")
         return
 
     key = f"{d.day:02d}-{MONTH_KEY_NAMES[d.strftime('%m')]}"
@@ -216,56 +212,54 @@ def handle_meniny(message):
     if not mena:
         bot.send_message(message.chat.id, "Tento dátum nemá meniny.")
         return
+
     vyznam = get_single_name_meaning(mena)
     bot.send_message(message.chat.id, f"{label} ({key}): {mena}{vyznam}")
 
-@bot.message_handler(commands=["meaning", "vyznam"])
+@bot.message_handler(commands=["vyznam", "meaning"])
 def meaning_cmd(message):
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
-        bot.send_message(message.chat.id, "Použitie: /vyznam Meno")
         return
 
     meno = parts[1].strip().lower()
-    norm = normalize_name(meno)
     data = NAME_MEANINGS.get(meno)
-
-    if not data:
-        podobne = find_similar_name(norm, [normalize_name(n) for n in NAME_MEANINGS.keys()])
-        if podobne:
-            meno = next(k for k in NAME_MEANINGS.keys() if normalize_name(k) == podobne)
-            data = NAME_MEANINGS.get(meno)
 
     if data:
         nd, countdown = next_nameday_info(meno)
-        date_line = ""
+        line = ""
         if nd:
-            month_name = MONTH_KEY_NAMES[f"{nd.month:02d}"]
-            abbr = MONTH_ABBR.get(month_name, month_name)
-            date_line = f"\n\nmeniny: {nd.day:02d} {abbr} ({countdown})"
-
+            line = f"\n\nMeniny: {nd.day:02d} {MONTH_ABBR[MONTH_KEY_NAMES[f'{nd.month:02d}']]} ({countdown})"
         bot.send_message(
             message.chat.id,
-            f"{meno.capitalize()}"
-            f"{date_line}\n\n"
-            f"pôvod: {data['origin']}\n"
-            f"význam: {data['meaning']}"
+            f"{meno.capitalize()}{line}\n\n"
+            f"Pôvod: {data['origin']}\n"
+            f"Význam: {data['meaning']}"
         )
     else:
-        bot.send_message(
-            message.chat.id,
-            f"{meno.capitalize()}\n\n{FALLBACK_TEXT}"
-        )
+        bot.send_message(message.chat.id, f"{meno.capitalize()}\n\n{FALLBACK_TEXT}")
+
+@bot.message_handler(commands=["random"])
+def random_cmd(message):
+    if not RANDOM_MEANINGS:
+        return
+    meno = random.choice(list(RANDOM_MEANINGS.keys()))
+    bot.send_message(message.chat.id, _format_meaning(meno, RANDOM_MEANINGS.get(meno)))
+
+@bot.message_handler(commands=["gift", "prianie", "zelanie"])
+def gift_cmd(message):
+    if not GIFT_WISHES:
+        return
+    parts = message.text.split(maxsplit=1)
+    meno = parts[1].strip() if len(parts) > 1 else message.from_user.first_name
+    text = random.choice(GIFT_WISHES)
+    bot.send_message(message.chat.id, text.replace("{meno}", meno))
 
 @bot.message_handler(func=lambda m: m.text and m.text.lower().startswith("!meniny"))
 def group_meniny(message):
     now = datetime.now()
     key = f"{now.day:02d}-{MONTH_KEY_NAMES[now.strftime('%m')]}"
-    mena = namedays.get(key)
-    if not mena:
-        bot.send_message(message.chat.id, "Tento dátum nemá meniny.")
-        return
-    bot.send_message(message.chat.id, f"Dnes ({key}): {mena}")
+    bot.send_message(message.chat.id, f"Dnes ({key}): {namedays.get(key, '—')}")
 
 @app.route("/" + TOKEN, methods=["POST"])
 def telegram_webhook():
