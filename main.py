@@ -246,7 +246,7 @@ def random_cmd(message):
     meno = random.choice(list(RANDOM_MEANINGS.keys()))
     bot.send_message(message.chat.id, _format_meaning(meno, RANDOM_MEANINGS.get(meno)))
 
-@bot.message_handler(commands=["gift", "prianie", "zelanie"])
+@bot.message_handler(commands=["blahozelanie", "prianie", "zelanie"])
 def gift_cmd(message):
     if not GIFT_WISHES:
         return
