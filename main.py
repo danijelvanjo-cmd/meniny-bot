@@ -138,7 +138,7 @@ def help_text():
         "/vyznam Daniel – význam mena\n\n"
         "🎲 Doplnky\n"
         "/random – náhodné meno\n"
-        "/gift – malé prianie\n\n"
+        "/blahozelanie – malé prianie\n\n"
         "ℹ️ Môj účel\n"
         "/meninar"
     )
