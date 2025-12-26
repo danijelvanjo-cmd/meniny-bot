@@ -276,7 +276,7 @@ def blahozelanie_cmd(message):
 
     bot.send_message(
         message.chat.id,
-        f"🎁 Blahoželanie pre {display_name}:\n\n{wish}"
+        f"🎁 Blahoželanie pre meno: {display_name}\n\n{wish}"
     )
 
 
@@ -441,6 +441,14 @@ def home():
 
 
 if __name__ == "__main__":
+    webhook_url = os.environ.get("WEBHOOK_URL", "").strip()
+    if not webhook_url.endswith("/"):
+        webhook_url += "/"
+
     bot.remove_webhook()
-    bot.set_webhook(url=os.environ.get("WEBHOOK_URL") + TOKEN)
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    bot.set_webhook(url=webhook_url + TOKEN)
+
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000))
+    )
