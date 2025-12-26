@@ -5,6 +5,7 @@ import flask
 import telebot
 import difflib
 import unicodedata
+import re
 from datetime import datetime, timedelta, date
 from collections import defaultdict
 
@@ -25,8 +26,13 @@ def _safe_load_json(path, default):
     except Exception:
         return default
 
-RANDOM_MEANINGS = _safe_load_json("random.json", {})
-GIFT_WISHES = _safe_load_json("gift.json", [])
+RANDOM_MSGS = _safe_load_json("random.json", [])
+GIFT_MSGS = _safe_load_json("gift.json", [])
+
+FALLBACK_TEXT = (
+    "Tento význam zatiaľ nemám uložený.\n"
+    "Skús iné meno alebo napíš /help."
+)
 
 MONTH_KEY_NAMES = {
     "01": "Január", "02": "Február", "03": "Marec", "04": "Apríl",
@@ -42,18 +48,12 @@ MONTH_GENITIVE = {
 }
 
 MONTH_ABBR = {
-    "Január": "JAN", "Február": "FEB", "Marec": "MAR", "Apríl": "APR",
-    "Máj": "MAJ", "Jún": "JUN", "Júl": "JUL", "August": "AUG",
-    "September": "SEP", "Október": "OKT", "November": "NOV", "December": "DEC",
+    "Január": "jan", "Február": "feb", "Marec": "mar", "Apríl": "apr",
+    "Máj": "máj", "Jún": "jún", "Júl": "júl", "August": "aug",
+    "September": "sep", "Október": "okt", "November": "nov", "December": "dec",
 }
 
 WEEKDAYS = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"]
-
-FALLBACK_TEXT = (
-    "Pôvod: Neznámy\n"
-    "Význam: Význam tohto mena sa v dostupných prameňoch nenašiel. "
-    "Možno je čas zapísať ho do histórie."
-)
 
 def split_names(names):
     cleaned = names.replace(" a ", ", ").replace(" - ", ", ").replace(".", "")
@@ -124,64 +124,45 @@ def next_nameday_info(name):
         countdown = f"o {delta} dní"
 
     return next_day, countdown
-def help_text():
-    return (
-        "Meninový bot 🎉\n\n"
-        "📅 Meniny\n"
-        "/meniny – dnešné meniny\n"
-        "/meniny zajtra – zajtrajšie meniny\n"
-        "/meniny vcera – včerajšie meniny\n"
-        "/meniny tyzden – meniny na 7 dní dopredu\n"
-        "/meniny 13-07 – meniny k dátumu\n\n"
-        "🔎 Podľa mena\n"
-        "/meniny Daniel – meniny\n"
-        "/vyznam Daniel – význam mena\n\n"
-        "🎲 Doplnky\n"
-        "/random – náhodné meno\n"
-        "/blahozelanie – malé prianie\n\n"
-        "ℹ️ Môj účel\n"
-        "/meninar"
-    )
 
+def _random_msg():
+    if not RANDOM_MSGS:
+        return ""
+    return random.choice(RANDOM_MSGS)
 
-@bot.message_handler(commands=["start", "help", "pomoc"])
+def _random_gift():
+    if not GIFT_MSGS:
+        return ""
+    return random.choice(GIFT_MSGS)
+
+@bot.message_handler(commands=["start", "help"])
 def help_cmd(message):
-    bot.send_message(message.chat.id, help_text())
-
-@bot.message_handler(commands=["meninar"])
-def about_cmd(message):
     bot.send_message(
         message.chat.id,
-        "👋 Ahoj!\n\n"
-        "Som meninový bot 🎉\n"
-        "Pomáham rýchlo zistiť, kto má meniny, kedy sú tie tvoje "
-        "a čo tvoje meno znamená.\n\n"
-        "Skús napríklad:\n"
-        "• /meniny\n"
-        "• /meniny zajtra\n"
-        "• /vyznam tvoje_meno\n\n"
-        "Alebo len klikni na moje meno a objav, čo všetko viem 😊"
+        "Príkazy:\n"
+        "/meniny – dnešné meniny\n"
+        "/meniny dnes | zajtra | vcera | tyzden\n"
+        "/meniny 13-07\n"
+        "/meniny David\n"
+        "/vyznam <meno>\n"
+        "/random\n"
+        "/gift"
     )
 
+@bot.message_handler(commands=["random"])
+def random_cmd(message):
+    bot.send_message(message.chat.id, _random_msg() or "Nič tu nemám.")
+
+@bot.message_handler(commands=["gift"])
+def gift_cmd(message):
+    bot.send_message(message.chat.id, _random_gift() or "Nič tu nemám.")
 
 @bot.message_handler(commands=["meniny"])
 def handle_meniny(message):
     now = datetime.now()
-
-    if now.month == 12 and now.day == 25:
-        bot.send_message(
-            message.chat.id,
-            "🎄 Veselé Vianoce! Prajeme pokoj, radosť a pohodu."
-        )
-
-    if now.month == 1 and now.day == 1:
-        bot.send_message(
-            message.chat.id,
-            "🎆 Šťastný nový rok! Nech je plný zdravia a úspechov."
-        )
-
     parts = message.text.split(maxsplit=1)
-    query = parts[1].strip().lower() if len(parts) > 1 else ""
+    query_raw = parts[1].strip() if len(parts) > 1 else ""
+    query = query_raw.lower()
 
     if query in ["tyzden", "týždeň", "7", "7dni"]:
         dnes = date.today()
@@ -194,6 +175,23 @@ def handle_meniny(message):
         bot.send_message(message.chat.id, "\n".join(vystup))
         return
 
+    m = re.match(r"^\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})\s*$", query_raw)
+    if m:
+        dd = int(m.group(1))
+        mm = int(m.group(2))
+        if 1 <= mm <= 12 and 1 <= dd <= 31:
+            key = f"{dd:02d}-{MONTH_KEY_NAMES[str(mm).zfill(2)]}"
+            mena = namedays.get(key)
+            if not mena:
+                bot.send_message(message.chat.id, "Tento dátum nemá meniny.")
+                return
+            vyznam = get_single_name_meaning(mena)
+            bot.send_message(
+                message.chat.id,
+                f"{dd:02d}. {MONTH_GENITIVE[MONTH_KEY_NAMES[str(mm).zfill(2)]]} ({key}): {mena}{vyznam}"
+            )
+            return
+
     if not query or query == "dnes":
         d = now
         label = "Dnes"
@@ -204,7 +202,36 @@ def handle_meniny(message):
         d = now - timedelta(days=1)
         label = "Včera"
     else:
-        bot.send_message(message.chat.id, "Neznámy príkaz.")
+        q = query_raw.strip()
+        q_low = q.lower()
+        if q_low in name_to_date:
+            keyname = q_low
+        else:
+            q_norm = normalize_name(q)
+            keyname = normalized_names.get(q_norm)
+            if not keyname:
+                close = find_similar_name(q_norm, normalized_names.keys())
+                keyname = normalized_names.get(close) if close else None
+
+        if not keyname:
+            bot.send_message(message.chat.id, "Neznámy príkaz alebo meno.")
+            return
+
+        nd, countdown = next_nameday_info(keyname)
+        if not nd:
+            bot.send_message(message.chat.id, "Neznámy príkaz alebo meno.")
+            return
+
+        key = f"{nd.day:02d}-{MONTH_KEY_NAMES[str(nd.month).zfill(2)]}"
+        mena = namedays.get(key, "—")
+        vyznam = get_single_name_meaning(keyname)
+        bot.send_message(
+            message.chat.id,
+            f"{keyname.capitalize()}\n\n"
+            f"Meniny: {nd.day:02d}. {MONTH_GENITIVE[MONTH_KEY_NAMES[str(nd.month).zfill(2)]]} ({countdown})\n"
+            f"Dátum: {key}\n"
+            f"V ten deň má meniny: {mena}{vyznam}"
+        )
         return
 
     key = f"{d.day:02d}-{MONTH_KEY_NAMES[d.strftime('%m')]}"
@@ -239,30 +266,8 @@ def meaning_cmd(message):
     else:
         bot.send_message(message.chat.id, f"{meno.capitalize()}\n\n{FALLBACK_TEXT}")
 
-@bot.message_handler(commands=["random"])
-def random_cmd(message):
-    if not RANDOM_MEANINGS:
-        return
-    meno = random.choice(list(RANDOM_MEANINGS.keys()))
-    bot.send_message(message.chat.id, _format_meaning(meno, RANDOM_MEANINGS.get(meno)))
-
-@bot.message_handler(commands=["blahozelanie", "prianie", "zelanie"])
-def gift_cmd(message):
-    if not GIFT_WISHES:
-        return
-    parts = message.text.split(maxsplit=1)
-    meno = parts[1].strip() if len(parts) > 1 else message.from_user.first_name
-    text = random.choice(GIFT_WISHES)
-    bot.send_message(message.chat.id, text.replace("{meno}", meno))
-
-@bot.message_handler(func=lambda m: m.text and m.text.lower().startswith("!meniny"))
-def group_meniny(message):
-    now = datetime.now()
-    key = f"{now.day:02d}-{MONTH_KEY_NAMES[now.strftime('%m')]}"
-    bot.send_message(message.chat.id, f"Dnes ({key}): {namedays.get(key, '—')}")
-
-@app.route("/" + TOKEN, methods=["POST"])
-def telegram_webhook():
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
     update = telebot.types.Update.de_json(
         flask.request.get_data().decode("utf-8")
     )
@@ -270,12 +275,10 @@ def telegram_webhook():
     return "OK", 200
 
 @app.route("/")
-def index():
-    return "Bot beží"
-
-if os.environ.get("RENDER"):
-    bot.delete_webhook(drop_pending_updates=True)
-    bot.set_webhook(url=f"https://meniny-bot.onrender.com/{TOKEN}")
+def home():
+    return "OK"
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    bot.remove_webhook()
+    bot.set_webhook(url=os.environ.get("WEBHOOK_URL") + TOKEN)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
