@@ -325,7 +325,7 @@ def random_pick():
         if canon:
             nd, countdown = next_nameday_info(canon)
             if nd:
-                extra += f"\nMeniny: {nd.day:02d}. {MONTH_GENITIVE_SK[nd.month]} ({countdown})"
+                extra += f"\n\nMeniny: {nd.day:02d}. {MONTH_GENITIVE_SK[nd.month]} ({countdown})"
             extra += format_meaning_block(canon)
 
         return f"🎲 Náhodné meno: {display}{extra}"
