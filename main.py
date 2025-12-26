@@ -19,12 +19,14 @@ with open("names.json", "r", encoding="utf-8") as f:
 with open("namedays.json", "r", encoding="utf-8") as f:
     NAME_MEANINGS = json.load(f)
 
+
 def _safe_load_json(path, default):
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return default
+
 
 RANDOM_MSGS = _safe_load_json("random.json", [])
 GIFT_MSGS = _safe_load_json("gift.json", [])
@@ -55,9 +57,11 @@ MONTH_ABBR = {
 
 WEEKDAYS = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"]
 
+
 def split_names(names):
     cleaned = names.replace(" a ", ", ").replace(" - ", ", ").replace(".", "")
     return [n.strip().lower() for n in cleaned.split(",") if n.strip()]
+
 
 def normalize_name(text):
     return "".join(
@@ -65,9 +69,11 @@ def normalize_name(text):
         if unicodedata.category(c) != "Mn"
     )
 
+
 def find_similar_name(name, candidates):
     matches = difflib.get_close_matches(name, candidates, n=1, cutoff=0.75)
     return matches[0] if matches else None
+
 
 def get_single_name_meaning(names_str):
     mena = split_names(names_str)
@@ -82,6 +88,7 @@ def get_single_name_meaning(names_str):
         )
     return f"\n\n{FALLBACK_TEXT}"
 
+
 def _format_meaning(name, data):
     if not data:
         return f"{name.capitalize()}\n\n{FALLBACK_TEXT}"
@@ -91,12 +98,38 @@ def _format_meaning(name, data):
         f"Význam: {data.get('meaning')}"
     )
 
+
+# Build index: name -> list of date keys
 name_to_date = defaultdict(list)
 for date_key, names in namedays.items():
     for name in split_names(names):
         name_to_date[name].append(date_key)
 
+# normalized -> canonical (for diacritics + typos)
 normalized_names = {normalize_name(n): n for n in name_to_date.keys()}
+
+
+def resolve_name(text):
+    """
+    Returns canonical keyname used in name_to_date (lowercase, no diacritics),
+    or None if not found. Accepts diacritics and small typos.
+    """
+    q = (text or "").strip()
+    if not q:
+        return None
+
+    q_low = q.lower()
+    if q_low in name_to_date:
+        return q_low
+
+    q_norm = normalize_name(q_low)
+    keyname = normalized_names.get(q_norm)
+    if keyname:
+        return keyname
+
+    close = find_similar_name(q_norm, normalized_names.keys())
+    return normalized_names.get(close) if close else None
+
 
 def next_nameday_info(name):
     today = date.today()
@@ -125,37 +158,127 @@ def next_nameday_info(name):
 
     return next_day, countdown
 
-def _random_msg():
+
+def help_text():
+    return (
+        "🎉 Meninový bot 🎉\n\n"
+        "📅 Meniny\n"
+        "/meniny – dnešné meniny\n"
+        "/meniny zajtra – zajtrajšie meniny\n"
+        "/meniny vcera – včerajšie meniny\n"
+        "/meniny tyzden – meniny na 7 dní dopredu\n"
+        "/meniny 13-07 – meniny k dátumu\n\n"
+        "🔎 Podľa mena\n"
+        "/meniny Daniel – kedy má Daniel meniny\n"
+        "/vyznam Daniel – význam mena\n\n"
+        "🎲 Doplnky\n"
+        "/random – náhodné meno\n"
+        "/blahozelanie Igor – prianie pre Igora\n\n"
+        "ℹ️ Info\n"
+        "/meninar – o botovi\n"
+        "/help | /pomoc | /info – tento zoznam"
+    )
+
+
+def _random_pick_from_random_json():
+    """
+    Your random.json is currently a dict (name -> info). If it is a list, also supported.
+    Returns a text message.
+    """
     if not RANDOM_MSGS:
-        return ""
-    return random.choice(RANDOM_MSGS)
+        return "Nič tu nemám."
 
-def _random_gift():
+    # If it's a list of strings
+    if isinstance(RANDOM_MSGS, list):
+        return random.choice(RANDOM_MSGS)
+
+    # If it's a dict (your case): pick a random name key
+    if isinstance(RANDOM_MSGS, dict):
+        raw_name = random.choice(list(RANDOM_MSGS.keys()))
+        canon = resolve_name(raw_name)  # try map to calendar spelling
+        display = raw_name.strip().capitalize()
+
+        extra = ""
+        if canon:
+            nd, countdown = next_nameday_info(canon)
+            if nd:
+                month_name = MONTH_KEY_NAMES[f"{nd.month:02d}"]
+                extra = f"\nMeniny: {nd.day:02d}. {MONTH_GENITIVE[month_name]} ({countdown})"
+
+            meaning_data = NAME_MEANINGS.get(canon)
+            if meaning_data:
+                extra += f"\nPôvod: {meaning_data.get('origin')}\nVýznam: {meaning_data.get('meaning')}"
+
+        return f"🎲 Náhodné meno: {display}{extra}"
+
+    # fallback
+    return "Nič tu nemám."
+
+
+def _random_gift_template():
     if not GIFT_MSGS:
-        return ""
-    return random.choice(GIFT_MSGS)
+        return None
+    if isinstance(GIFT_MSGS, list):
+        return random.choice(GIFT_MSGS)
+    return None
 
-@bot.message_handler(commands=["start", "help"])
+
+# ===== Commands =====
+
+@bot.message_handler(commands=["start", "help", "pomoc", "info"])
 def help_cmd(message):
+    bot.send_message(message.chat.id, help_text())
+
+
+@bot.message_handler(commands=["meninar"])
+def about_cmd(message):
     bot.send_message(
         message.chat.id,
-        "Príkazy:\n"
-        "/meniny – dnešné meniny\n"
-        "/meniny dnes | zajtra | vcera | tyzden\n"
-        "/meniny 13-07\n"
-        "/meniny David\n"
-        "/vyznam <meno>\n"
-        "/random\n"
-        "/gift"
+        "👋 Ahoj!\n\n"
+        "Som meninový bot 🎉\n"
+        "Pomáham rýchlo zistiť, kto má meniny, kedy sú tie tvoje "
+        "a čo tvoje meno znamená.\n\n"
+        "Skús napríklad:\n"
+        "• /meniny\n"
+        "• /meniny zajtra\n"
+        "• /vyznam tvoje_meno\n\n"
+        "Alebo len napíš meno (napr. Igor) a skúsim odpovedať 😊"
     )
+
 
 @bot.message_handler(commands=["random"])
 def random_cmd(message):
-    bot.send_message(message.chat.id, _random_msg() or "Nič tu nemám.")
+    bot.send_message(message.chat.id, _random_pick_from_random_json())
 
-@bot.message_handler(commands=["gift"])
-def gift_cmd(message):
-    bot.send_message(message.chat.id, _random_gift() or "Nič tu nemám.")
+
+@bot.message_handler(commands=["blahozelanie", "gift"])
+def blahozelanie_cmd(message):
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        bot.send_message(message.chat.id, "Použitie: /blahozelanie Igor")
+        return
+
+    raw_name = parts[1].strip()
+    if not raw_name:
+        bot.send_message(message.chat.id, "Použitie: /blahozelanie Igor")
+        return
+
+    template = _random_gift_template()
+    if not template:
+        bot.send_message(message.chat.id, "Nemám uložené priania 😕")
+        return
+
+    # Keep user's diacritics for addressing, just make it look nice
+    display_name = raw_name[:1].upper() + raw_name[1:]
+
+    # Support both {meno} placeholder and plain templates
+    wish = template.replace("{meno}", display_name)
+
+    bot.send_message(
+        message.chat.id,
+        f"🎁 Blahoželanie pre {display_name}:\n\n{wish}"
+    )
+
 
 @bot.message_handler(commands=["meniny"])
 def handle_meniny(message):
@@ -202,17 +325,7 @@ def handle_meniny(message):
         d = now - timedelta(days=1)
         label = "Včera"
     else:
-        q = query_raw.strip()
-        q_low = q.lower()
-        if q_low in name_to_date:
-            keyname = q_low
-        else:
-            q_norm = normalize_name(q)
-            keyname = normalized_names.get(q_norm)
-            if not keyname:
-                close = find_similar_name(q_norm, normalized_names.keys())
-                keyname = normalized_names.get(close) if close else None
-
+        keyname = resolve_name(query_raw)
         if not keyname:
             bot.send_message(message.chat.id, "Neznámy príkaz alebo meno.")
             return
@@ -225,6 +338,7 @@ def handle_meniny(message):
         key = f"{nd.day:02d}-{MONTH_KEY_NAMES[str(nd.month).zfill(2)]}"
         mena = namedays.get(key, "—")
         vyznam = get_single_name_meaning(keyname)
+
         bot.send_message(
             message.chat.id,
             f"{keyname.capitalize()}\n\n"
@@ -243,29 +357,75 @@ def handle_meniny(message):
     vyznam = get_single_name_meaning(mena)
     bot.send_message(message.chat.id, f"{label} ({key}): {mena}{vyznam}")
 
+
 @bot.message_handler(commands=["vyznam", "meaning"])
 def meaning_cmd(message):
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
+        bot.send_message(message.chat.id, "Použitie: /vyznam Daniel")
         return
 
-    meno = parts[1].strip().lower()
-    data = NAME_MEANINGS.get(meno)
+    raw = parts[1].strip()
+    keyname = resolve_name(raw)
+    if not keyname:
+        bot.send_message(message.chat.id, f"{raw.capitalize()}\n\n{FALLBACK_TEXT}")
+        return
 
+    data = NAME_MEANINGS.get(keyname)
     if data:
-        nd, countdown = next_nameday_info(meno)
+        nd, countdown = next_nameday_info(keyname)
         line = ""
         if nd:
             line = f"\n\nMeniny: {nd.day:02d} {MONTH_ABBR[MONTH_KEY_NAMES[f'{nd.month:02d}']]} ({countdown})"
         bot.send_message(
             message.chat.id,
-            f"{meno.capitalize()}{line}\n\n"
+            f"{keyname.capitalize()}{line}\n\n"
             f"Pôvod: {data['origin']}\n"
             f"Význam: {data['meaning']}"
         )
     else:
-        bot.send_message(message.chat.id, f"{meno.capitalize()}\n\n{FALLBACK_TEXT}")
+        bot.send_message(message.chat.id, f"{keyname.capitalize()}\n\n{FALLBACK_TEXT}")
 
+
+# ===== Auto-reply: user types just a name =====
+@bot.message_handler(func=lambda m: m.text and not m.text.startswith("/"))
+def name_autoreply(message):
+    text = message.text.strip()
+
+    # ignore super short / super long
+    if len(text) < 2 or len(text) > 30:
+        return
+
+    keyname = resolve_name(text)
+    if not keyname:
+        return  # silent ignore (so "ahoj" doesn't spam)
+
+    nd, countdown = next_nameday_info(keyname)
+    if not nd:
+        return
+
+    month_name = MONTH_KEY_NAMES[f"{nd.month:02d}"]
+    date_str = f"{nd.day:02d}. {MONTH_GENITIVE[month_name]}"
+
+    meaning_data = NAME_MEANINGS.get(keyname)
+    meaning_block = ""
+    if meaning_data:
+        meaning_block = (
+            f"\n\nPôvod: {meaning_data.get('origin')}\n"
+            f"Význam: {meaning_data.get('meaning')}"
+        )
+    else:
+        meaning_block = f"\n\n{FALLBACK_TEXT}"
+
+    bot.send_message(
+        message.chat.id,
+        f"📅 {keyname.capitalize()}\n"
+        f"Meniny: {date_str} ({countdown})"
+        f"{meaning_block}"
+    )
+
+
+# ===== WEBHOOK + SETTINGS (DO NOT TOUCH) =====
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = telebot.types.Update.de_json(
@@ -274,9 +434,11 @@ def webhook():
     bot.process_new_updates([update])
     return "OK", 200
 
+
 @app.route("/")
 def home():
     return "OK"
+
 
 if __name__ == "__main__":
     bot.remove_webhook()
