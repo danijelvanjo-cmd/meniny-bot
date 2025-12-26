@@ -42,7 +42,7 @@ RANDOM_MSGS = _safe_load_json("random.json", [])
 GIFT_MSGS = _safe_load_json("gift.json", [])
 
 FALLBACK_TEXT = (
-    "Tento význam zatiaľ nemám uložený.\n"
+    "Vaše meno sa tu nenachádza. Choďte a vytvorte preň vlastnú históriu.\n"
     "Skús iné meno alebo napíš /help."
 )
 
@@ -296,7 +296,7 @@ def help_text():
         "/vyznam Daniel – význam mena\n\n"
         "🎲 Doplnky\n"
         "/random – náhodné meno\n"
-        "/blahozelanie Igor – prianie pre meno: Igor\n\n"
+        "/blahozelanie Pavel – prianie pre meno: Pavel\n\n"
         "ℹ️ Info\n"
         "/meninar – o botovi\n"
         "/help | /pomoc | /info – tento zoznam"
@@ -463,7 +463,7 @@ def meniny_cmd(message):
             return
 
         key = make_calendar_key(nd.day, nd.month)
-        mena = NAMEDAYS_BY_KEY.get(key, "—")
+        mena = NAMEDAYS_BY_KEY.get(key, "-")
 
         bot.send_message(
             message.chat.id,
@@ -543,7 +543,7 @@ def name_autoreply(message):
 
     bot.send_message(
         message.chat.id,
-        f"📅 {keyname.capitalize()}\n"
+        f"📅 {keyname.capitalize()}\n\n"
         f"Meniny: {date_str} ({countdown})"
         f"{format_meaning_block(keyname)}"
     )
