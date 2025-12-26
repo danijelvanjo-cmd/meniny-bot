@@ -410,8 +410,14 @@ def meniny_cmd(message):
         for i in range(7):
             d = dnes + timedelta(days=i)
             key = make_calendar_key(d.day, d.month)
-            mena = NAMEDAYS_BY_KEY.get(key, "—")
-            vystup.append(f"{WEEKDAYS[d.weekday()]} {d.day:02d}.{d.month:02d}. – {mena}")
+            mena = NAMEDAYS_BY_KEY.get(key)
+if not mena or not mena.strip():
+    mena = "bez menín"
+
+vystup.append(
+    f"{WEEKDAYS[d.weekday()]} {d.day:02d}.{d.month:02d}. – {mena}"
+)
+
         bot.send_message(message.chat.id, "\n".join(vystup))
         return
 
