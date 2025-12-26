@@ -1,3 +1,4 @@
+@@ -1,570 +1,570 @@
 import os
 import json
 import random
@@ -42,6 +43,7 @@ RANDOM_MSGS = _safe_load_json("random.json", [])
 GIFT_MSGS = _safe_load_json("gift.json", [])
 
 FALLBACK_TEXT = (
+    "Tento význam zatiaľ nemám uložený.\n"
     "Vaše meno sa tu nenachádza. Choďte a vytvorte preň vlastnú históriu.\n"
     "Skús iné meno alebo napíš /help."
 )
@@ -296,6 +298,7 @@ def help_text():
         "/vyznam Daniel – význam mena\n\n"
         "🎲 Doplnky\n"
         "/random – náhodné meno\n"
+        "/blahozelanie Igor – prianie pre meno: Igor\n\n"
         "/blahozelanie Pavel – prianie pre meno: Pavel\n\n"
         "ℹ️ Info\n"
         "/meninar – o botovi\n"
@@ -325,7 +328,7 @@ def random_pick():
         if canon:
             nd, countdown = next_nameday_info(canon)
             if nd:
-                extra += f"\n\nMeniny: {nd.day:02d}. {MONTH_GENITIVE_SK[nd.month]} ({countdown})"
+                extra += f"\nMeniny: {nd.day:02d}. {MONTH_GENITIVE_SK[nd.month]} ({countdown})"
             extra += format_meaning_block(canon)
 
         return f"🎲 Náhodné meno: {display}{extra}"
@@ -410,14 +413,8 @@ def meniny_cmd(message):
         for i in range(7):
             d = dnes + timedelta(days=i)
             key = make_calendar_key(d.day, d.month)
-            mena = NAMEDAYS_BY_KEY.get(key)
-if not mena or not mena.strip():
-    mena = "bez menín"
-
-vystup.append(
-    f"{WEEKDAYS[d.weekday()]} {d.day:02d}.{d.month:02d}. – {mena}"
-)
-
+            mena = NAMEDAYS_BY_KEY.get(key, "—")
+            vystup.append(f"{WEEKDAYS[d.weekday()]} {d.day:02d}.{d.month:02d}. – {mena}")
         bot.send_message(message.chat.id, "\n".join(vystup))
         return
 
@@ -469,6 +466,7 @@ vystup.append(
             return
 
         key = make_calendar_key(nd.day, nd.month)
+        mena = NAMEDAYS_BY_KEY.get(key, "—")
         mena = NAMEDAYS_BY_KEY.get(key, "-")
 
         bot.send_message(
@@ -549,6 +547,7 @@ def name_autoreply(message):
 
     bot.send_message(
         message.chat.id,
+        f"📅 {keyname.capitalize()}\n"
         f"📅 {keyname.capitalize()}\n\n"
         f"Meniny: {date_str} ({countdown})"
         f"{format_meaning_block(keyname)}"
